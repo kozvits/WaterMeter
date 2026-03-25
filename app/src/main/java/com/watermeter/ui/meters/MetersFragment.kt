@@ -61,7 +61,7 @@ class MetersFragment : Fragment() {
             // Переключаемся на вкладку "Добавить показания"
             requireActivity().findViewById<com.google.android.material.bottomnavigation.BottomNavigationView>(
                 R.id.bottomNav
-            ).selectedItemId = R.id.nav_add
+            ).selectedItemId = R.id.addReadingFragment
         }
     }
 
