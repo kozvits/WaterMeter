@@ -96,6 +96,7 @@ class AddReadingFragment : Fragment() {
                         .centerCrop()
                         .into(binding.imgPreview)
                     binding.cardPreview.isVisible = true
+                    binding.tvHint.isVisible = true
                 } else {
                     binding.cardPreview.isVisible = false
                 }
@@ -169,6 +170,7 @@ class AddReadingFragment : Fragment() {
         binding.etMeterName.text?.clear()
         binding.etReading.text?.clear()
         binding.cardPreview.isVisible = false
+        binding.tvHint.isVisible = false
     }
 
     // ── Camera / Gallery ──────────────────────────────────────────────────────
