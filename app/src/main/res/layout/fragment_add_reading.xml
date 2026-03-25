@@ -25,7 +25,7 @@
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:layout_marginTop="8dp"
-            android:text="📷 Сфотографировать"
+            android:text="Сфотографировать"
             app:icon="@drawable/ic_camera"
             app:iconGravity="textStart"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
@@ -36,20 +36,21 @@
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:layout_marginTop="8dp"
-            android:text="🖼 Выбрать из галереи"
+            android:text="Выбрать из галереи"
             app:icon="@drawable/ic_gallery"
             app:iconGravity="textStart"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
 
-        <!-- Image preview card -->
+        <!-- Image preview card with circular frame overlay -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardPreview"
             android:layout_width="match_parent"
-            android:layout_height="200dp"
+            android:layout_height="280dp"
             android:layout_marginTop="16dp"
             android:visibility="gone"
             app:cardCornerRadius="12dp">
 
+            <!-- Превью фото -->
             <ImageView
                 android:id="@+id/imgPreview"
                 android:layout_width="match_parent"
@@ -57,7 +58,25 @@
                 android:scaleType="centerCrop"
                 android:contentDescription="Превью счётчика" />
 
+            <!-- Круглая рамка-прицел поверх фото -->
+            <com.watermeter.ui.add.MeterFrameOverlay
+                android:id="@+id/meterFrameOverlay"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
         </com.google.android.material.card.MaterialCardView>
+
+        <!-- Подсказка под превью -->
+        <TextView
+            android:id="@+id/tvHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Расположите циферблат счётчика внутри круга"
+            android:textAlignment="center"
+            android:textSize="12sp"
+            android:textColor="@color/colorTextSecondary"
+            android:visibility="gone" />
 
         <!-- OCR progress -->
         <LinearLayout
@@ -65,9 +84,7 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center"
-            android:layout_marginTop="8dp"
-            android:visibility="gone"
-            android:id="@+id/layoutOcrStatus">
+            android:layout_marginTop="8dp">
 
             <ProgressBar
                 android:id="@+id/progressOcr"
@@ -86,7 +103,7 @@
 
         </LinearLayout>
 
-        <!-- Section: meter data -->
+        <!-- Section header -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -102,8 +119,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:hint="Номер счётчика *"
+            android:hint="Номер счётчика (из штрихкода/QR)"
             app:startIconDrawable="@drawable/ic_qr_code"
+            app:endIconMode="clear_text"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
             <com.google.android.material.textfield.TextInputEditText
@@ -122,6 +140,7 @@
             android:layout_marginTop="8dp"
             android:hint="Название (необязательно)"
             app:startIconDrawable="@drawable/ic_label"
+            app:endIconMode="clear_text"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
             <com.google.android.material.textfield.TextInputEditText
@@ -138,16 +157,17 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:hint="Показания (м³) *"
+            android:hint="Показания (целые м³) *"
             app:startIconDrawable="@drawable/ic_speed"
             app:suffixText="м³"
+            app:endIconMode="clear_text"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etReading"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="numberDecimal"
+                android:inputType="number"
                 android:imeOptions="actionDone" />
 
         </com.google.android.material.textfield.TextInputLayout>
