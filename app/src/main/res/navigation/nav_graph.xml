@@ -24,7 +24,7 @@
         tools:layout="@layout/fragment_history">
         <argument
             android:name="meterId"
-            app:argType="long"
+            app:argType="integer"
             android:defaultValue="-1" />
     </fragment>
 
