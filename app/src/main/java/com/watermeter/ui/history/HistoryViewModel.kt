@@ -21,8 +21,9 @@ class HistoryViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    // meterId is passed via Navigation SafeArgs
-    private val meterId: Long = savedStateHandle["meterId"] ?: -1L
+    // Nav graph передаёт meterId как Int (argType="integer")
+    // Конвертируем в Long для Room
+    private val meterId: Long = (savedStateHandle.get<Int>("meterId") ?: -1).toLong()
 
     val meterWithReadings: StateFlow<MeterWithReadings?> = repository
         .getMeterWithReadings(meterId)
