@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Счётчики воды</string>
+
+    <!-- Tabs -->
+    <string name="tab_meters">Счётчики</string>
+    <string name="tab_add">Добавить</string>
+    <string name="tab_history">История</string>
+    <string name="tab_settings">Настройки</string>
+
+    <!-- Meters screen -->
+    <string name="meters_empty">Нет счётчиков.\nНажмите + чтобы добавить первый.</string>
+    <string name="btn_send_telegram">Отправить в Telegram</string>
+
+    <!-- Add screen -->
+    <string name="btn_camera">Сфотографировать</string>
+    <string name="btn_gallery">Выбрать из галереи</string>
+    <string name="btn_save">Сохранить</string>
+    <string name="btn_reset">Очистить</string>
+    <string name="hint_serial">Номер счётчика *</string>
+    <string name="hint_name">Название (необязательно)</string>
+    <string name="hint_reading">Показания (м³) *</string>
+    <string name="ocr_processing">Распознавание…</string>
+    <string name="ocr_success">✅ Данные распознаны — проверьте и нажмите Сохранить</string>
+    <string name="ocr_failed">⚠️ Распознавание не удалось — введите данные вручную</string>
+    <string name="saved_ok">✅ Показания сохранены!</string>
+
+    <!-- Settings screen -->
+    <string name="settings_telegram_section">Telegram-бот</string>
+    <string name="hint_bot_token">Токен бота (Bot Token)</string>
+    <string name="hint_chat_id">Chat ID</string>
+    <string name="btn_save_settings">Сохранить настройки</string>
+    <string name="settings_saved">✅ Настройки сохранены</string>
+
+    <!-- Dialogs -->
+    <string name="dialog_delete_meter_title">Удалить счётчик?</string>
+    <string name="dialog_delete_reading_title">Удалить показание?</string>
+    <string name="action_delete">Удалить</string>
+    <string name="action_cancel">Отмена</string>
+    <string name="action_save">Сохранить</string>
+    <string name="action_edit">✏️ Редактировать</string>
+
+    <!-- Permissions -->
+    <string name="permission_camera_denied">Нужен доступ к камере</string>
+    <string name="permission_storage_denied">Нужен доступ к галерее</string>
+
+    <!-- Content descriptions -->
+    <string name="cd_meter_icon">Счётчик</string>
+    <string name="cd_preview">Превью счётчика</string>
+</resources>

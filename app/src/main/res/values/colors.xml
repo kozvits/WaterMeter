@@ -1,1 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand -->
+    <color name="colorPrimary">#1565C0</color>
+    <color name="colorPrimaryDark">#0D47A1</color>
+    <color name="colorPrimaryLight">#E3F2FD</color>
+    <color name="colorAccent">#29B6F6</color>
 
+    <!-- Semantic -->
+    <color name="colorSuccess">#2E7D32</color>
+    <color name="colorError">#C62828</color>
+    <color name="colorWarning">#F57F17</color>
+
+    <!-- Backgrounds -->
+    <color name="colorBackground">#F5F7FA</color>
+    <color name="colorSurface">#FFFFFF</color>
+
+    <!-- Text -->
+    <color name="colorTextPrimary">#1A1A2E</color>
+    <color name="colorTextSecondary">#6B7280</color>
+
+    <!-- Telegram brand color -->
+    <color name="colorTelegram">#0088CC</color>
+
+    <!-- Misc -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+</resources>
