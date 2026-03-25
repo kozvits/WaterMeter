@@ -19,38 +19,123 @@
             app:title="Добавить показания"
             app:titleTextColor="@color/colorTextPrimary" />
 
-        <!-- Camera button -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnCamera"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="8dp"
-            android:text="Сфотографировать"
-            app:icon="@drawable/ic_camera"
-            app:iconGravity="textStart"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+        <!-- ═══════════════════════════════════════════════════════════
+             БЛОК 1: Номер счётчика — сканирование QR/штрихкода
+             ═══════════════════════════════════════════════════════════ -->
 
-        <!-- Gallery button -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnGallery"
+        <TextView
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="Выбрать из галереи"
-            app:icon="@drawable/ic_gallery"
-            app:iconGravity="textStart"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+            android:layout_marginBottom="4dp"
+            android:text="Шаг 1 — Номер счётчика"
+            android:textSize="13sp"
+            android:textColor="@color/colorTextSecondary"
+            android:textAllCaps="true"
+            android:letterSpacing="0.06" />
 
-        <!-- Image preview card with circular frame overlay -->
+        <!-- Поле номера счётчика с иконкой-кнопкой QR слева -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilSerialNumber"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Нажмите значок для сканирования"
+            app:startIconDrawable="@drawable/ic_qr_scan"
+            app:startIconTint="@color/colorPrimary"
+            app:endIconMode="clear_text"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etSerialNumber"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="text"
+                android:imeOptions="actionNext"
+                android:hint="Номер счётчика (QR / штрихкод)" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Статус сканирования QR -->
+        <TextView
+            android:id="@+id/tvScanStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="12sp"
+            android:textColor="@color/colorTextSecondary"
+            android:visibility="gone" />
+
+        <!-- ═══════════════════════════════════════════════════════════
+             БЛОК 2: Показания — фото + OCR
+             ═══════════════════════════════════════════════════════════ -->
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="4dp"
+            android:text="Шаг 2 — Показания счётчика"
+            android:textSize="13sp"
+            android:textColor="@color/colorTextSecondary"
+            android:textAllCaps="true"
+            android:letterSpacing="0.06" />
+
+        <!-- Поле показаний с иконкой-кнопкой камеры слева -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilReading"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Нажмите значок для съёмки"
+            app:startIconDrawable="@drawable/ic_camera"
+            app:startIconTint="@color/colorPrimary"
+            app:suffixText="м³"
+            app:endIconMode="clear_text"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etReading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:imeOptions="actionDone"
+                android:hint="Показания (целые м³)" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- OCR progress -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="6dp">
+
+            <ProgressBar
+                android:id="@+id/progressOcr"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvOcrStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:textSize="12sp"
+                android:textColor="@color/colorTextSecondary"
+                android:visibility="gone" />
+
+        </LinearLayout>
+
+        <!-- Превью фото со счётчиком + круглая рамка -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardPreview"
             android:layout_width="match_parent"
-            android:layout_height="280dp"
-            android:layout_marginTop="16dp"
+            android:layout_height="260dp"
+            android:layout_marginTop="12dp"
             android:visibility="gone"
             app:cardCornerRadius="12dp">
 
-            <!-- Превью фото -->
             <ImageView
                 android:id="@+id/imgPreview"
                 android:layout_width="match_parent"
@@ -58,7 +143,6 @@
                 android:scaleType="centerCrop"
                 android:contentDescription="Превью счётчика" />
 
-            <!-- Круглая рамка-прицел поверх фото -->
             <com.watermeter.ui.add.MeterFrameOverlay
                 android:id="@+id/meterFrameOverlay"
                 android:layout_width="match_parent"
@@ -72,73 +156,28 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="Расположите циферблат счётчика внутри круга"
+            android:text="Циферблат в круге — для лучшего распознавания"
             android:textAlignment="center"
             android:textSize="12sp"
             android:textColor="@color/colorTextSecondary"
             android:visibility="gone" />
 
-        <!-- OCR progress -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center"
-            android:layout_marginTop="8dp">
-
-            <ProgressBar
-                android:id="@+id/progressOcr"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:visibility="gone" />
-
-            <TextView
-                android:id="@+id/tvOcrStatus"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="Распознавание..."
-                android:textColor="@color/colorTextSecondary"
-                android:visibility="gone" />
-
-        </LinearLayout>
-
-        <!-- Section header -->
+        <!-- Необязательное название счётчика -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
-            android:text="Данные счётчика"
+            android:layout_marginBottom="4dp"
+            android:text="Дополнительно"
             android:textSize="13sp"
             android:textColor="@color/colorTextSecondary"
             android:textAllCaps="true"
-            android:letterSpacing="0.08" />
+            android:letterSpacing="0.06" />
 
-        <!-- Serial number field -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:hint="Номер счётчика (из штрихкода/QR)"
-            app:startIconDrawable="@drawable/ic_qr_code"
-            app:endIconMode="clear_text"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etSerialNumber"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="text"
-                android:imeOptions="actionNext" />
-
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- Meter name field -->
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:hint="Название (необязательно)"
+            android:hint="Название счётчика (необязательно)"
             app:startIconDrawable="@drawable/ic_label"
             app:endIconMode="clear_text"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
@@ -148,31 +187,11 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="text"
-                android:imeOptions="actionNext" />
-
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- Reading value field -->
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:hint="Показания (целые м³) *"
-            app:startIconDrawable="@drawable/ic_speed"
-            app:suffixText="м³"
-            app:endIconMode="clear_text"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etReading"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="number"
                 android:imeOptions="actionDone" />
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Action buttons -->
+        <!-- Кнопки одинакового размера -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -183,7 +202,7 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnReset"
                 android:layout_width="0dp"
-                android:layout_height="56dp"
+                android:layout_height="52dp"
                 android:layout_weight="1"
                 android:layout_marginEnd="8dp"
                 android:text="Очистить"
@@ -192,8 +211,8 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnSave"
                 android:layout_width="0dp"
-                android:layout_height="56dp"
-                android:layout_weight="2"
+                android:layout_height="52dp"
+                android:layout_weight="1"
                 android:text="Сохранить"
                 android:backgroundTint="@color/colorPrimary" />
 
