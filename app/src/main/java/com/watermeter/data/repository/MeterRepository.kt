@@ -13,7 +13,7 @@ class MeterRepository @Inject constructor(
     private val dao: MeterDao
 ) {
 
-    // тФАтФА Meters тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
+    // ── Meters ───────────────────────────────────────────────────────────────
 
     fun getMetersWithReadings(): Flow<List<MeterWithReadings>> =
         dao.getMetersWithReadings()
@@ -29,7 +29,7 @@ class MeterRepository @Inject constructor(
 
     suspend fun getMeterById(id: Long): Meter? = dao.getMeterById(id)
 
-    // тФАтФА Readings тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
+    // ── Readings ─────────────────────────────────────────────────────────────
 
     fun getReadingsForMeter(meterId: Long): Flow<List<Reading>> =
         dao.getReadingsForMeter(meterId)
