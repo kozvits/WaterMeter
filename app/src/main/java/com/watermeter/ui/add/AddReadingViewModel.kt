@@ -14,6 +14,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -81,27 +82,22 @@ class AddReadingViewModel @Inject constructor(
         _uiState.value = AddUiState.Processing
 
         try {
-            // Ищем существующий счётчик по серийному номеру
-            val existingMeters = repository.getMetersWithReadings()
-            // Используем suspend collect через first()
-            var existingMeterId: Long? = null
-            existingMeters.collect { list ->
-                existingMeterId = list.firstOrNull {
-                    it.meter.serialNumber.equals(serialNumber.trim(), ignoreCase = true)
-                }?.meter?.id
-                return@collect // берём только первое значение
-            }
+            // Получаем текущий список счётчиков через first() из Flow
+            val allMeters = repository.getMetersWithReadings().first()
+            val existingMeterId: Long? = allMeters.firstOrNull {
+                it.meter.serialNumber.equals(serialNumber.trim(), ignoreCase = true)
+            }?.meter?.id
 
             val meterId = existingMeterId ?: run {
                 // Создаём новый счётчик
-                val newMeter = Meter(
+                val newMeter = com.watermeter.data.model.Meter(
                     serialNumber = serialNumber.trim(),
                     name = meterName.trim().ifBlank { serialNumber.trim() }
                 )
                 repository.insertMeter(newMeter)
             }
 
-            val reading = Reading(
+            val reading = com.watermeter.data.model.Reading(
                 meterId = meterId,
                 value = value,
                 photoPath = savedPhotoUri?.toString()
