@@ -31,6 +31,13 @@
             </intent-filter>
         </activity>
 
+        <!-- Полноэкранный сканер QR/штрихкода -->
+        <activity
+            android:name=".ui.add.BarcodeScannerActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.WaterMeter" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
