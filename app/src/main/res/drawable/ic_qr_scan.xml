@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Левый верхний угол -->
+    <path android:fillColor="#000000"
+        android:pathData="M3,3 L9,3 L9,5 L5,5 L5,9 L3,9 Z"/>
+    <!-- Правый верхний угол -->
+    <path android:fillColor="#000000"
+        android:pathData="M21,3 L21,9 L19,9 L19,5 L15,5 L15,3 Z"/>
+    <!-- Левый нижний угол -->
+    <path android:fillColor="#000000"
+        android:pathData="M3,21 L3,15 L5,15 L5,19 L9,19 L9,21 Z"/>
+    <!-- Правый нижний угол -->
+    <path android:fillColor="#000000"
+        android:pathData="M21,21 L15,21 L15,19 L19,19 L19,15 L21,15 Z"/>
+    <!-- Центральный прицел -->
+    <path android:fillColor="#000000"
+        android:pathData="M10,10 L14,10 L14,14 L10,14 Z"/>
+</vector>
