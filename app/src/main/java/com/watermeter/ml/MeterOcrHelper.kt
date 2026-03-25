@@ -2,6 +2,8 @@ package com.watermeter.ml
 
 import android.content.Context
 import android.net.Uri
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -12,98 +14,82 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 data class OcrResult(
-    val meterValue: String?,    // Показания, напр. "147.832"
-    val serialNumber: String?,  // Номер счётчика, напр. "ВСХ-15-00384521"
+    val meterValue: String?,    // Только целые м³, напр. "3469"
+    val serialNumber: String?,  // Из штрихкода или QR-кода
     val rawText: String
 )
 
 @Singleton
 class MeterOcrHelper @Inject constructor() {
 
-    private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    private val textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    private val barcodeScanner = BarcodeScanning.getClient()
 
     /**
-     * Распознаёт текст на изображении по URI.
-     * Вызывается из корутины — приостанавливается до получения результата ML Kit.
+     * Основной метод: параллельно запускает OCR текста и сканирование штрихкода/QR.
+     * Показания — только целые числа (до красного поля).
+     * Серийный номер — из штрихкода или QR-кода.
      */
-    suspend fun recognize(context: Context, imageUri: Uri): OcrResult =
+    suspend fun recognize(context: Context, imageUri: Uri): OcrResult {
+        val image = InputImage.fromFilePath(context, imageUri)
+        val rawText = runTextOcr(image)
+        val serialFromCode = runBarcodeScanner(image)
+        val meterValue = extractIntegerReading(rawText)
+        return OcrResult(
+            meterValue = meterValue,
+            serialNumber = serialFromCode,
+            rawText = rawText
+        )
+    }
+
+    private suspend fun runTextOcr(image: InputImage): String =
         suspendCancellableCoroutine { cont ->
-            try {
-                val image = InputImage.fromFilePath(context, imageUri)
-                recognizer.process(image)
-                    .addOnSuccessListener { result ->
-                        cont.resume(parseText(result.text))
-                    }
-                    .addOnFailureListener { e ->
-                        cont.resumeWithException(e)
-                    }
-            } catch (e: Exception) {
-                cont.resumeWithException(e)
-            }
+            textRecognizer.process(image)
+                .addOnSuccessListener { result -> cont.resume(result.text) }
+                .addOnFailureListener { e -> cont.resumeWithException(e) }
         }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Parsing helpers
-    // ─────────────────────────────────────────────────────────────────────────
+    private suspend fun runBarcodeScanner(image: InputImage): String? =
+        suspendCancellableCoroutine { cont ->
+            barcodeScanner.process(image)
+                .addOnSuccessListener { barcodes ->
+                    val best = barcodes
+                        .sortedByDescending { barcode ->
+                            when (barcode.format) {
+                                Barcode.FORMAT_QR_CODE  -> 3
+                                Barcode.FORMAT_CODE_128 -> 2
+                                Barcode.FORMAT_CODE_39  -> 1
+                                else                    -> 0
+                            }
+                        }
+                        .firstOrNull()
+                    cont.resume(best?.rawValue?.trim())
+                }
+                .addOnFailureListener { cont.resume(null) }
+        }
 
     /**
-     * Извлекает из сырого OCR-текста:
-     *  - показания счётчика (5–8 цифр, возможно с дробной частью)
-     *  - серийный номер (буквенно-цифровая комбинация)
+     * Извлекает показания счётчика как ЦЕЛОЕ число.
      *
-     * Алгоритм:
-     * 1. Нормализуем текст: убираем лишние пробелы, заменяем O→0, I→1 в числах.
-     * 2. Ищем кандидатов на показания через регулярное выражение.
-     * 3. Ищем серийный номер — сначала по паттерну «буквы-цифры», затем эвристически.
+     * Примеры реальных счётчиков:
+     *  "03469.7 m³"  → "03469"   (Zenner: красное поле = дробь)
+     *  "01221 774"   → "01221"   (БелЦЕННЕР: красные разряды после пробела)
+     *  "107289"      → "107289"  (WPD 50: без дроби)
+     *  "00228"       → "00228"   (простой счётчик)
      */
-    private fun parseText(rawText: String): OcrResult {
-        val normalized = normalizeOcr(rawText)
+    private fun extractIntegerReading(rawText: String): String? {
+        val normalized = normalizeOcrDigits(rawText)
 
-        // ── Показания счётчика ────────────────────────────────────────────────
-        // Примеры: "00147832", "147.832", "147,832", "0014 783 2"
-        val readingRegex = Regex(
-            """(?<!\d)(\d{1,3}(?:\s\d{3})*[.,]\d{1,3}|\d{5,8})(?!\d)"""
-        )
-        val meterValue = readingRegex.findAll(normalized)
-            .map { it.value.replace(" ", "").replace(",", ".") }
-            .filter { candidate ->
-                candidate.filter { it.isDigit() }.length in 5..8
-            }
-            // Числа с дробной частью приоритетнее целых — они точнее соответствуют показаниям
-            .maxByOrNull { candidate -> if (candidate.contains('.')) 10 else 0 }
+        // Ищем 5–8 цифр, отрезаем всё после точки/запятой/пробела+цифры
+        val readingRegex = Regex("""(?<![.\d])(\d{5,8})(?:[.,\s]\d+)?(?!\d)""")
 
-        // ── Серийный номер ────────────────────────────────────────────────────
-        // Паттерн 1: кириллические/латинские буквы + цифры (ВСХ-15-00384521)
-        val serialRegex1 = Regex(
-            """([А-ЯA-Z]{2,4}[-\s]?\d{2}[-\s]?\d{4,8})""",
-            RegexOption.IGNORE_CASE
-        )
-        // Паттерн 2: явный маркер "№", "No", "SN"
-        val serialRegex2 = Regex(
-            """(?:№|[Nn][o°]?|[Ss][/]?[Nn])[:\s]*([A-ZА-Яa-zа-я0-9]{6,12})"""
-        )
-        val serialNumber = serialRegex1.find(normalized)?.groupValues?.getOrNull(1)
-            ?: serialRegex2.find(normalized)?.groupValues?.getOrNull(1)
-            ?: heuristicSerial(normalized.lines())
-
-        return OcrResult(meterValue, serialNumber?.trim(), rawText)
+        return readingRegex.findAll(normalized)
+            .map { it.groupValues[1] }
+            .filter { it.length in 5..8 }
+            .maxByOrNull { it.length }
     }
 
-    /**
-     * Исправляет типичные OCR-ошибки в числах: буква O → 0, буква I → 1.
-     */
-    private fun normalizeOcr(text: String): String {
-        return text
-            .replace(Regex("""(?<=[0-9])[Oo](?=[0-9])"""), "0")
-            .replace(Regex("""(?<=[0-9])[Ii](?=[0-9])"""), "1")
-    }
-
-    /**
-     * Эвристика: строка, содержащая 7+ цифр и не слишком длинная —
-     * вероятный кандидат на серийный номер.
-     */
-    private fun heuristicSerial(lines: List<String>): String? =
-        lines.firstOrNull { line ->
-            line.count { it.isDigit() } >= 7 && line.length in 7..20
-        }
+    private fun normalizeOcrDigits(text: String): String = text
+        .replace(Regex("""(?<=\d)[Oo](?=\d)"""), "0")
+        .replace(Regex("""(?<=\d)[Il](?=\d)"""), "1")
 }
