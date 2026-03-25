@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/metersFragment">
+
+    <fragment
+        android:id="@+id/metersFragment"
+        android:name="com.watermeter.ui.meters.MetersFragment"
+        android:label="Счётчики"
+        tools:layout="@layout/fragment_meters" />
+
+    <fragment
+        android:id="@+id/addReadingFragment"
+        android:name="com.watermeter.ui.add.AddReadingFragment"
+        android:label="Добавить"
+        tools:layout="@layout/fragment_add_reading" />
+
+    <fragment
+        android:id="@+id/historyFragment"
+        android:name="com.watermeter.ui.history.HistoryFragment"
+        android:label="История"
+        tools:layout="@layout/fragment_history">
+        <argument
+            android:name="meterId"
+            app:argType="long"
+            android:defaultValue="-1" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/settingsFragment"
+        android:name="com.watermeter.ui.settings.SettingsFragment"
+        android:label="Настройки"
+        tools:layout="@layout/fragment_settings" />
+
+    <action
+        android:id="@+id/action_metersFragment_to_historyFragment"
+        app:destination="@id/historyFragment" />
+
+</navigation>
