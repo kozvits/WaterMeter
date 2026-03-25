@@ -1,6 +1,8 @@
 package com.watermeter.ui.add
 
 import android.Manifest
+import android.app.Activity
+import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -15,7 +17,6 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
 import com.google.android.material.snackbar.Snackbar
-import com.watermeter.R
 import com.watermeter.databinding.FragmentAddReadingBinding
 import com.watermeter.ml.OcrResult
 import com.watermeter.util.ImageUtils
@@ -35,34 +36,41 @@ class AddReadingFragment : Fragment() {
 
     // ── Permission launchers ──────────────────────────────────────────────────
 
-    private val cameraPermissionLauncher = registerForActivityResult(
+    private val cameraPermLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) launchCamera() else showSnackbar("Нужен доступ к камере")
     }
 
-    private val galleryPermissionLauncher = registerForActivityResult(
+    private val barcodeCameraPermLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) launchGallery() else showSnackbar("Нужен доступ к галерее")
+        if (granted) launchBarcodeScanner() else showSnackbar("Нужен доступ к камере")
     }
 
     // ── Activity result launchers ─────────────────────────────────────────────
 
+    /** Камера → фото → OCR показаний */
     private val cameraLauncher = registerForActivityResult(
         ActivityResultContracts.TakePicture()
     ) { success ->
-        if (success) {
-            tempPhotoUri?.let { uri ->
-                viewModel.setImageUri(uri, requireContext())
-            }
-        }
+        if (success) tempPhotoUri?.let { viewModel.setImageUri(it, requireContext()) }
     }
 
-    private val galleryLauncher = registerForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let { viewModel.setImageUri(it, requireContext()) }
+    /** Сканер штрихкода/QR → серийный номер */
+    private val barcodeLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val value = result.data?.getStringExtra(BarcodeScannerActivity.RESULT_BARCODE_VALUE)
+            if (!value.isNullOrBlank()) {
+                binding.etSerialNumber.setText(value)
+                binding.tvScanStatus.text = "✅ Код считан: $value"
+                binding.tvScanStatus.isVisible = true
+            } else {
+                showSnackbar("Код не распознан — введите вручную")
+            }
+        }
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -76,29 +84,43 @@ class AddReadingFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        setupClickListeners()
+        setupIconListeners()
+        setupButtons()
         observeState()
     }
 
-    private fun setupClickListeners() {
-        binding.btnCamera.setOnClickListener { requestCameraPermission() }
-        binding.btnGallery.setOnClickListener { requestGalleryPermission() }
+    // ── Setup ─────────────────────────────────────────────────────────────────
+
+    private fun setupIconListeners() {
+        // Иконка QR слева в поле "Номер счётчика" → запускает сканер
+        binding.tilSerialNumber.setStartIconOnClickListener {
+            requestBarcodeCameraPermission()
+        }
+
+        // Иконка камеры слева в поле "Показания" → делает фото → OCR
+        binding.tilReading.setStartIconOnClickListener {
+            requestCameraPermission()
+        }
+    }
+
+    private fun setupButtons() {
         binding.btnSave.setOnClickListener { saveReading() }
         binding.btnReset.setOnClickListener { resetForm() }
     }
+
+    // ── State observation ─────────────────────────────────────────────────────
 
     private fun observeState() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.imageUri.collectLatest { uri ->
                 if (uri != null) {
                     Glide.with(this@AddReadingFragment)
-                        .load(uri)
-                        .centerCrop()
-                        .into(binding.imgPreview)
+                        .load(uri).centerCrop().into(binding.imgPreview)
                     binding.cardPreview.isVisible = true
                     binding.tvHint.isVisible = true
                 } else {
                     binding.cardPreview.isVisible = false
+                    binding.tvHint.isVisible = false
                 }
             }
         }
@@ -106,33 +128,32 @@ class AddReadingFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.uiState.collectLatest { state ->
                 when (state) {
-                    is AddUiState.Idle -> setLoadingState(false)
-
-                    is AddUiState.Processing -> setLoadingState(true)
+                    is AddUiState.Idle       -> setOcrLoading(false)
+                    is AddUiState.Processing -> setOcrLoading(true)
 
                     is AddUiState.OcrDone -> {
-                        setLoadingState(false)
-                        fillFieldsFromOcr(state.result)
-                        if (state.result.meterValue == null && state.result.serialNumber == null) {
-                            showSnackbar("⚠️ Распознавание не удалось — введите данные вручную")
+                        setOcrLoading(false)
+                        fillReadingFromOcr(state.result)
+                        if (state.result.meterValue == null) {
+                            showSnackbar("⚠️ Не удалось распознать показания — введите вручную")
                         } else {
-                            showSnackbar("✅ Данные распознаны — проверьте и нажмите Сохранить")
+                            showSnackbar("✅ Показания распознаны: ${state.result.meterValue} м³")
                         }
                     }
 
                     is AddUiState.OcrError -> {
-                        setLoadingState(false)
+                        setOcrLoading(false)
                         showSnackbar(state.message)
                     }
 
                     is AddUiState.Saved -> {
-                        setLoadingState(false)
+                        setOcrLoading(false)
                         showSnackbar("✅ Показания сохранены!")
                         resetForm()
                     }
 
                     is AddUiState.Error -> {
-                        setLoadingState(false)
+                        setOcrLoading(false)
                         showSnackbar(state.message)
                     }
                 }
@@ -140,22 +161,22 @@ class AddReadingFragment : Fragment() {
         }
     }
 
-    private fun fillFieldsFromOcr(result: OcrResult) {
-        if (!result.serialNumber.isNullOrBlank()) {
-            binding.etSerialNumber.setText(result.serialNumber)
-        }
+    private fun fillReadingFromOcr(result: OcrResult) {
+        // Заполняем только поле показаний — серийный номер уже получен из сканера
         if (!result.meterValue.isNullOrBlank()) {
             binding.etReading.setText(result.meterValue)
         }
     }
 
-    private fun setLoadingState(loading: Boolean) {
+    private fun setOcrLoading(loading: Boolean) {
         binding.progressOcr.isVisible = loading
-        binding.btnSave.isEnabled = !loading
-        binding.btnCamera.isEnabled = !loading
-        binding.btnGallery.isEnabled = !loading
         binding.tvOcrStatus.isVisible = loading
+        binding.btnSave.isEnabled = !loading
+        binding.tilReading.isStartIconCheckable = !loading
+        binding.tilSerialNumber.isStartIconCheckable = !loading
     }
+
+    // ── Save / Reset ──────────────────────────────────────────────────────────
 
     private fun saveReading() {
         val serial = binding.etSerialNumber.text?.toString() ?: ""
@@ -171,20 +192,17 @@ class AddReadingFragment : Fragment() {
         binding.etReading.text?.clear()
         binding.cardPreview.isVisible = false
         binding.tvHint.isVisible = false
+        binding.tvScanStatus.isVisible = false
     }
 
-    // ── Camera / Gallery ──────────────────────────────────────────────────────
+    // ── Camera / Barcode permissions & launch ─────────────────────────────────
 
     private fun requestCameraPermission() {
-        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        cameraPermLauncher.launch(Manifest.permission.CAMERA)
     }
 
-    private fun requestGalleryPermission() {
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
-            Manifest.permission.READ_MEDIA_IMAGES
-        else
-            Manifest.permission.READ_EXTERNAL_STORAGE
-        galleryPermissionLauncher.launch(permission)
+    private fun requestBarcodeCameraPermission() {
+        barcodeCameraPermLauncher.launch(Manifest.permission.CAMERA)
     }
 
     private fun launchCamera() {
@@ -197,8 +215,9 @@ class AddReadingFragment : Fragment() {
         cameraLauncher.launch(tempPhotoUri)
     }
 
-    private fun launchGallery() {
-        galleryLauncher.launch("image/*")
+    private fun launchBarcodeScanner() {
+        val intent = Intent(requireContext(), BarcodeScannerActivity::class.java)
+        barcodeLauncher.launch(intent)
     }
 
     private fun showSnackbar(message: String) {
