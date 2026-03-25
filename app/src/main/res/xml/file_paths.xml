@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Для CameraX / TakePicture — внешнее приватное хранилище приложения -->
+    <external-files-path
+        name="meter_photos"
+        path="Pictures/" />
+    <!-- Внутреннее кэш-хранилище (запасной вариант) -->
+    <cache-path
+        name="meter_cache"
+        path="images/" />
+</paths>
