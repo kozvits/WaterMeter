@@ -20,7 +20,7 @@ import javax.inject.Inject
 
 sealed class AddUiState {
     object Idle : AddUiState()
-    object Processing : AddUiState()          // OCR или сохранение фото
+    object Processing : AddUiState()
     data class OcrDone(val result: OcrResult) : AddUiState()
     data class OcrError(val message: String) : AddUiState()
     object Saved : AddUiState()
@@ -36,42 +36,45 @@ class AddReadingViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<AddUiState>(AddUiState.Idle)
     val uiState: StateFlow<AddUiState> = _uiState.asStateFlow()
 
-    /** URI выбранного/снятого изображения */
     private val _imageUri = MutableStateFlow<Uri?>(null)
     val imageUri: StateFlow<Uri?> = _imageUri.asStateFlow()
 
-    /** URI сохранённого (обрезанного) фото в галерее */
-    private var savedPhotoUri: Uri? = null
+    // URI файла, сохранённого MeterCameraActivity
+    private var photoFileUri: Uri? = null
 
+    /**
+     * Вызывается когда MeterCameraActivity вернула URI готового снимка.
+     * Запускает OCR и параллельно сохраняет обрезанную копию в галерею.
+     */
     fun setImageUri(uri: Uri, context: Context) {
         _imageUri.value = uri
+        photoFileUri = uri
         runOcr(uri, context)
     }
 
     private fun runOcr(uri: Uri, context: Context) = viewModelScope.launch {
         _uiState.value = AddUiState.Processing
         try {
-            // Параллельно: OCR + обрезка и сохранение фото в галерею
             val ocrResult = ocrHelper.recognize(context, uri)
-            savedPhotoUri = ImageUtils.cropAndSaveToGallery(context, uri)
+            // Сохраняем обрезанную копию в публичную галерею
+            ImageUtils.cropAndSaveToGallery(context, uri)
             _uiState.value = AddUiState.OcrDone(ocrResult)
         } catch (e: Exception) {
-            _uiState.value = AddUiState.OcrError("Распознавание не удалось. Введите данные вручную.")
+            _uiState.value = AddUiState.OcrError("Распознавание не удалось — введите вручную.")
         }
     }
 
-    /**
-     * Сохраняет показания. Если счётчик с таким serialNumber уже есть — добавляет
-     * показание к нему. Если нет — создаёт новый счётчик.
-     */
     fun saveReading(
         serialNumber: String,
         meterName: String,
         valueStr: String
     ) = viewModelScope.launch {
-        val value = valueStr.replace(",", ".").toDoubleOrNull()
-        if (value == null) {
-            _uiState.value = AddUiState.Error("Неверный формат показаний. Используйте цифры, например: 147.832")
+        // Принимаем только целые числа
+        val valueClean = valueStr.trim().replace(",", ".").trimEnd('.')
+        val value = valueClean.toDoubleOrNull()
+
+        if (value == null || value <= 0) {
+            _uiState.value = AddUiState.Error("Введите показания — целое число, например: 3469")
             return@launch
         }
         if (serialNumber.isBlank()) {
@@ -82,25 +85,23 @@ class AddReadingViewModel @Inject constructor(
         _uiState.value = AddUiState.Processing
 
         try {
-            // Получаем текущий список счётчиков через first() из Flow
             val allMeters = repository.getMetersWithReadings().first()
             val existingMeterId: Long? = allMeters.firstOrNull {
                 it.meter.serialNumber.equals(serialNumber.trim(), ignoreCase = true)
             }?.meter?.id
 
             val meterId = existingMeterId ?: run {
-                // Создаём новый счётчик
-                val newMeter = com.watermeter.data.model.Meter(
+                val newMeter = Meter(
                     serialNumber = serialNumber.trim(),
                     name = meterName.trim().ifBlank { serialNumber.trim() }
                 )
                 repository.insertMeter(newMeter)
             }
 
-            val reading = com.watermeter.data.model.Reading(
+            val reading = Reading(
                 meterId = meterId,
                 value = value,
-                photoPath = savedPhotoUri?.toString()
+                photoPath = photoFileUri?.toString()
             )
             repository.insertReading(reading)
             _uiState.value = AddUiState.Saved
@@ -112,6 +113,6 @@ class AddReadingViewModel @Inject constructor(
     fun resetState() {
         _uiState.value = AddUiState.Idle
         _imageUri.value = null
-        savedPhotoUri = null
+        photoFileUri = null
     }
 }
