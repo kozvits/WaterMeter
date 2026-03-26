@@ -18,20 +18,16 @@ data class OcrResult(
 )
 
 /**
- * OCR для распознавания ЦЕЛЫХ показаний счётчика воды.
+ * OCR показаний счётчика воды.
  *
- * Ключевые правила:
- *  1. Берём только цифры ДО красного поля (дробная часть отбрасывается).
- *  2. Показания — это 5–8 подряд идущих цифр.
- *  3. Из нескольких кандидатов выбираем самый длинный блок — он и есть главный одометр.
+ * На вход приходит уже ОБРЕЗАННОЕ фото (только зона одометра из MeterCameraActivity).
+ * Поэтому OCR видит почти исключительно цифры — лишний текст минимален.
  *
- * Примеры:
- *   "03469.7 m³"      → "03469"
- *   "01221 774"       → "01221"   (красное поле = " 774")
- *   "012217,4"        → "012217"  не верно — тогда → "01221"  (5 цифр до запятой)
- *   "107289"          → "107289"
- *   "00228"           → "00228"
- *   "1 0 7 2 8 9"     → "107289"  (OCR с пробелами между цифрами)
+ * Алгоритм:
+ * 1. Собираем все распознанные цифровые блоки (игнорируем буквы)
+ * 2. Выбираем самую длинную непрерывную цифровую последовательность
+ * 3. Отрезаем дробную часть (после точки/запятой/пробела — красное поле)
+ * 4. Принимаем только результат длиной 4–8 цифр
  */
 @Singleton
 class MeterOcrHelper @Inject constructor() {
@@ -45,7 +41,7 @@ class MeterOcrHelper @Inject constructor() {
                 recognizer.process(image)
                     .addOnSuccessListener { result ->
                         val raw = result.text
-                        val value = extractIntegerReading(raw)
+                        val value = parseReading(result)
                         cont.resume(OcrResult(meterValue = value, rawText = raw))
                     }
                     .addOnFailureListener { e -> cont.resumeWithException(e) }
@@ -54,44 +50,71 @@ class MeterOcrHelper @Inject constructor() {
             }
         }
 
-    private fun extractIntegerReading(rawText: String): String? {
-        // Шаг 1: нормализация OCR-ошибок
-        val normalized = normalizeOcr(rawText)
-
-        // Шаг 2: убираем пробелы между одиночными цифрами
-        // ("1 0 7 2 8 9" → "107289")
-        val compacted = normalized.replace(Regex("""(?<=\d) (?=\d)"""), "")
-
-        // Шаг 3: разбиваем текст на токены по строкам
+    private fun parseReading(
+        result: com.google.mlkit.vision.text.Text
+    ): String? {
         val candidates = mutableListOf<String>()
 
-        compacted.lines().forEach { line ->
-            // Паттерн: 5–8 цифр подряд, после которых:
-            //   — ничего (конец числа)
-            //   — точка/запятая с дробью  → отрезаем
-            //   — пробел + цифры           → это красное поле, отрезаем
-            //   — буква (м³, m³)           → конец числа, ОК
-            val regex = Regex("""(?<!\d)(\d{5,8})(?:[.,]\d+|(?=\s+\d)|\s*${'$'}|\s*[^\d]|${'$'})""")
-            regex.findAll(line).forEach { match ->
-                candidates.add(match.groupValues[1])
+        // Итерируем по блокам и строкам — ML Kit возвращает иерархию
+        for (block in result.textBlocks) {
+            for (line in block.lines) {
+                val lineText = line.text
+
+                // Убираем OCR-замены и пробелы между цифрами
+                val cleaned = normalizeOcr(lineText)
+                    .replace(Regex("""\s+"""), " ")
+                    .trim()
+
+                // Извлекаем числовой префикс строки (до первого нецифрового символа
+                // кроме пробела перед следующей цифрой — то есть красное поле)
+                extractInteger(cleaned)?.let { candidates.add(it) }
             }
         }
 
         if (candidates.isEmpty()) return null
 
-        // Шаг 4: выбираем наилучший кандидат
-        // Приоритет: длина 6–8 цифр (типовой одометр) > 5 цифр
+        // Берём кандидата с наибольшим количеством цифр (= главный одометр)
         return candidates
-            .filter { it.length in 5..8 }
-            // Исключаем явные серийники: строки, где после числа идут буквы вплотную
+            .filter { it.length in 4..8 }
             .maxByOrNull { it.length }
     }
 
     /**
-     * Типичные OCR-замены:
-     *  O → 0, I/l → 1 — только между цифрами
+     * Из строки вида "03469 7" или "03469.7" или "012217 74" берём только
+     * первый цифровой блок — ДО пробела+цифра или ДО точки/запятой.
+     *
+     * Примеры:
+     *   "03469.7"   → "03469"
+     *   "03469 7"   → "03469"   (пробел перед красным полем)
+     *   "012217 74" → "012217"
+     *   "107289"    → "107289"
+     *   "00228"     → "00228"
      */
+    private fun extractInteger(text: String): String? {
+        // Убираем пробелы внутри числа (ML Kit иногда разбивает "1 0 7 2 8 9")
+        val compacted = text.replace(Regex("""(?<=\d) (?=\d)"""), "")
+
+        // Ищем первый цифровой блок
+        val match = Regex("""(\d+)""").find(compacted) ?: return null
+        var digits = match.value
+
+        // Проверяем, что за блоком не сразу идут ещё цифры через разделитель
+        // "03469.7" → берём "03469", игнорируем ".7"
+        // "03469 7" → берём "03469", игнорируем " 7" (красное поле)
+        val afterMatch = compacted.substring(match.range.last + 1)
+        if (afterMatch.startsWith(".") || afterMatch.startsWith(",") ||
+            afterMatch.startsWith(" ")) {
+            // Всё верно — дробь/красное поле уже отрезаны, берём только digits
+        }
+
+        return digits.ifEmpty { null }
+    }
+
     private fun normalizeOcr(text: String): String = text
-        .replace(Regex("""(?<=\d)[Oo](?=\d)"""), "0")
-        .replace(Regex("""(?<=\d)[Il](?=\d)"""), "1")
+        .replace(Regex("""[Oo]"""), "0")
+        .replace(Regex("""[Il|]"""), "1")
+        .replace(Regex("""[Ss]"""), "5")
+        .replace(Regex("""[Gg]"""), "6")
+        .replace(Regex("""[Zz]"""), "2")
+        .replace(Regex("""[Bb]"""), "8")
 }
