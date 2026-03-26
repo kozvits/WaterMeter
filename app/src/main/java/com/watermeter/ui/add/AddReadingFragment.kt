@@ -4,13 +4,11 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.FileProvider
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -19,7 +17,6 @@ import com.bumptech.glide.Glide
 import com.google.android.material.snackbar.Snackbar
 import com.watermeter.databinding.FragmentAddReadingBinding
 import com.watermeter.ml.OcrResult
-import com.watermeter.util.ImageUtils
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -32,14 +29,12 @@ class AddReadingFragment : Fragment() {
 
     private val viewModel: AddReadingViewModel by viewModels()
 
-    private var tempPhotoUri: Uri? = null
-
     // ── Permission launchers ──────────────────────────────────────────────────
 
     private val cameraPermLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) launchCamera() else showSnackbar("Нужен доступ к камере")
+        if (granted) launchMeterCamera() else showSnackbar("Нужен доступ к камере")
     }
 
     private val barcodeCameraPermLauncher = registerForActivityResult(
@@ -50,14 +45,20 @@ class AddReadingFragment : Fragment() {
 
     // ── Activity result launchers ─────────────────────────────────────────────
 
-    /** Камера → фото → OCR показаний */
-    private val cameraLauncher = registerForActivityResult(
-        ActivityResultContracts.TakePicture()
-    ) { success ->
-        if (success) tempPhotoUri?.let { viewModel.setImageUri(it, requireContext()) }
+    /** MeterCameraActivity → возвращает URI сделанного фото */
+    private val meterCameraLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val uriStr = result.data?.getStringExtra(MeterCameraActivity.RESULT_PHOTO_URI)
+            if (!uriStr.isNullOrBlank()) {
+                val uri = Uri.parse(uriStr)
+                viewModel.setImageUri(uri, requireContext())
+            }
+        }
     }
 
-    /** Сканер штрихкода/QR → серийный номер */
+    /** BarcodeScannerActivity → возвращает строку серийного номера */
     private val barcodeLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -68,7 +69,7 @@ class AddReadingFragment : Fragment() {
                 binding.tvScanStatus.text = "✅ Код считан: $value"
                 binding.tvScanStatus.isVisible = true
             } else {
-                showSnackbar("Код не распознан — введите вручную")
+                showSnackbar("Код не распознан — введите номер вручную")
             }
         }
     }
@@ -89,17 +90,14 @@ class AddReadingFragment : Fragment() {
         observeState()
     }
 
-    // ── Setup ─────────────────────────────────────────────────────────────────
-
     private fun setupIconListeners() {
-        // Иконка QR слева в поле "Номер счётчика" → запускает сканер
+        // Иконка QR → сканер штрихкода/QR
         binding.tilSerialNumber.setStartIconOnClickListener {
-            requestBarcodeCameraPermission()
+            barcodeCameraPermLauncher.launch(Manifest.permission.CAMERA)
         }
-
-        // Иконка камеры слева в поле "Показания" → делает фото → OCR
+        // Иконка камеры → MeterCameraActivity (с прицелом)
         binding.tilReading.setStartIconOnClickListener {
-            requestCameraPermission()
+            cameraPermLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
@@ -108,7 +106,7 @@ class AddReadingFragment : Fragment() {
         binding.btnReset.setOnClickListener { resetForm() }
     }
 
-    // ── State observation ─────────────────────────────────────────────────────
+    // ── State ─────────────────────────────────────────────────────────────────
 
     private fun observeState() {
         viewLifecycleOwner.lifecycleScope.launch {
@@ -117,10 +115,8 @@ class AddReadingFragment : Fragment() {
                     Glide.with(this@AddReadingFragment)
                         .load(uri).centerCrop().into(binding.imgPreview)
                     binding.cardPreview.isVisible = true
-                    binding.tvHint.isVisible = true
                 } else {
                     binding.cardPreview.isVisible = false
-                    binding.tvHint.isVisible = false
                 }
             }
         }
@@ -128,32 +124,27 @@ class AddReadingFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.uiState.collectLatest { state ->
                 when (state) {
-                    is AddUiState.Idle       -> setOcrLoading(false)
-                    is AddUiState.Processing -> setOcrLoading(true)
+                    is AddUiState.Idle       -> setLoading(false)
+                    is AddUiState.Processing -> setLoading(true)
 
                     is AddUiState.OcrDone -> {
-                        setOcrLoading(false)
-                        fillReadingFromOcr(state.result)
-                        if (state.result.meterValue == null) {
-                            showSnackbar("⚠️ Не удалось распознать показания — введите вручную")
-                        } else {
-                            showSnackbar("✅ Показания распознаны: ${state.result.meterValue} м³")
-                        }
+                        setLoading(false)
+                        applyOcrResult(state.result)
                     }
 
                     is AddUiState.OcrError -> {
-                        setOcrLoading(false)
+                        setLoading(false)
                         showSnackbar(state.message)
                     }
 
                     is AddUiState.Saved -> {
-                        setOcrLoading(false)
+                        setLoading(false)
                         showSnackbar("✅ Показания сохранены!")
                         resetForm()
                     }
 
                     is AddUiState.Error -> {
-                        setOcrLoading(false)
+                        setLoading(false)
                         showSnackbar(state.message)
                     }
                 }
@@ -161,22 +152,20 @@ class AddReadingFragment : Fragment() {
         }
     }
 
-    private fun fillReadingFromOcr(result: OcrResult) {
-        // Заполняем только поле показаний — серийный номер уже получен из сканера
+    private fun applyOcrResult(result: OcrResult) {
         if (!result.meterValue.isNullOrBlank()) {
             binding.etReading.setText(result.meterValue)
+            showSnackbar("✅ Показания: ${result.meterValue} м³ — проверьте и сохраните")
+        } else {
+            showSnackbar("⚠️ Показания не распознаны — введите вручную")
         }
     }
 
-    private fun setOcrLoading(loading: Boolean) {
+    private fun setLoading(loading: Boolean) {
         binding.progressOcr.isVisible = loading
         binding.tvOcrStatus.isVisible = loading
         binding.btnSave.isEnabled = !loading
-        binding.tilReading.isStartIconCheckable = !loading
-        binding.tilSerialNumber.isStartIconCheckable = !loading
     }
-
-    // ── Save / Reset ──────────────────────────────────────────────────────────
 
     private fun saveReading() {
         val serial = binding.etSerialNumber.text?.toString() ?: ""
@@ -191,28 +180,14 @@ class AddReadingFragment : Fragment() {
         binding.etMeterName.text?.clear()
         binding.etReading.text?.clear()
         binding.cardPreview.isVisible = false
-        binding.tvHint.isVisible = false
         binding.tvScanStatus.isVisible = false
     }
 
-    // ── Camera / Barcode permissions & launch ─────────────────────────────────
+    // ── Launch activities ─────────────────────────────────────────────────────
 
-    private fun requestCameraPermission() {
-        cameraPermLauncher.launch(Manifest.permission.CAMERA)
-    }
-
-    private fun requestBarcodeCameraPermission() {
-        barcodeCameraPermLauncher.launch(Manifest.permission.CAMERA)
-    }
-
-    private fun launchCamera() {
-        val photoFile = ImageUtils.createTempImageFile(requireContext())
-        tempPhotoUri = FileProvider.getUriForFile(
-            requireContext(),
-            "${requireContext().packageName}.fileprovider",
-            photoFile
-        )
-        cameraLauncher.launch(tempPhotoUri)
+    private fun launchMeterCamera() {
+        val intent = Intent(requireContext(), MeterCameraActivity::class.java)
+        meterCameraLauncher.launch(intent)
     }
 
     private fun launchBarcodeScanner() {
@@ -220,9 +195,8 @@ class AddReadingFragment : Fragment() {
         barcodeLauncher.launch(intent)
     }
 
-    private fun showSnackbar(message: String) {
-        Snackbar.make(binding.root, message, Snackbar.LENGTH_LONG).show()
-    }
+    private fun showSnackbar(msg: String) =
+        Snackbar.make(binding.root, msg, Snackbar.LENGTH_LONG).show()
 
     override fun onDestroyView() {
         super.onDestroyView()
