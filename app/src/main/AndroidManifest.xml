@@ -38,6 +38,13 @@
             android:screenOrientation="portrait"
             android:theme="@style/Theme.WaterMeter" />
 
+        <!-- Камера со прицелом для съёмки показаний -->
+        <activity
+            android:name=".ui.add.MeterCameraActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.WaterMeter" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
