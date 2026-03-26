@@ -41,6 +41,13 @@ class AddReadingViewModel @Inject constructor(
     // URI файла, сохранённого MeterCameraActivity
     private var photoFileUri: Uri? = null
 
+    // Серийный номер — обновляется из Fragment при сканировании QR
+    private var _currentSerialNumber: String = ""
+
+    fun onSerialNumberScanned(serial: String) {
+        _currentSerialNumber = serial
+    }
+
     /**
      * Вызывается когда MeterCameraActivity вернула URI готового снимка.
      * Запускает OCR и параллельно сохраняет обрезанную копию в галерею.
@@ -54,13 +61,35 @@ class AddReadingViewModel @Inject constructor(
     private fun runOcr(uri: Uri, context: Context) = viewModelScope.launch {
         _uiState.value = AddUiState.Processing
         try {
-            // Фото уже обрезано по зоне прицела в MeterCameraActivity.
-            // Запускаем только OCR — никакого дополнительного кропа.
             val ocrResult = ocrHelper.recognize(context, uri)
-            _uiState.value = AddUiState.OcrDone(ocrResult)
+
+            // Защита: если OCR вернул значение == серийному номеру счётчика,
+            // это ложное срабатывание (показания попали в зону серийника или наоборот).
+            // В этом случае возвращаем пустое значение — пользователь введёт вручную.
+            val safeResult = if (isReadingEqualsSerial(ocrResult.meterValue)) {
+                ocrResult.copy(meterValue = null)
+            } else {
+                ocrResult
+            }
+
+            _uiState.value = AddUiState.OcrDone(safeResult)
         } catch (e: Exception) {
             _uiState.value = AddUiState.OcrError("Распознавание не удалось — введите вручную.")
         }
+    }
+
+    /** Возвращает true если распознанные показания совпадают с уже введённым серийным номером */
+    private fun isReadingEqualsSerial(meterValue: String?): Boolean {
+        if (meterValue.isNullOrBlank()) return false
+        // Сравниваем только цифры (игнорируем дефисы, пробелы в серийнике)
+        val serialDigits = _currentSerialNumber.filter { it.isDigit() }
+        val readingDigits = meterValue.filter { it.isDigit() }
+        if (serialDigits.isBlank() || readingDigits.isBlank()) return false
+        // Считаем совпадением если показания — подстрока серийника или наоборот,
+        // либо полное совпадение цифровых частей
+        return serialDigits == readingDigits ||
+               serialDigits.contains(readingDigits) ||
+               readingDigits.contains(serialDigits)
     }
 
     fun saveReading(
@@ -113,5 +142,6 @@ class AddReadingViewModel @Inject constructor(
         _uiState.value = AddUiState.Idle
         _imageUri.value = null
         photoFileUri = null
+        _currentSerialNumber = ""
     }
 }
