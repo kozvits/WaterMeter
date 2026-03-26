@@ -68,6 +68,8 @@ class AddReadingFragment : Fragment() {
                 binding.etSerialNumber.setText(value)
                 binding.tvScanStatus.text = "✅ Код считан: $value"
                 binding.tvScanStatus.isVisible = true
+                // Передаём серийник в ViewModel для фильтрации ложных показаний
+                viewModel.onSerialNumberScanned(value)
             } else {
                 showSnackbar("Код не распознан — введите номер вручную")
             }
