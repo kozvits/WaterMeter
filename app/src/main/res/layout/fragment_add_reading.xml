@@ -12,93 +12,84 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- Toolbar -->
         <com.google.android.material.appbar.MaterialToolbar
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             app:title="Добавить показания"
             app:titleTextColor="@color/colorTextPrimary" />
 
-        <!-- ═══════════════════════════════════════════════════════════
-             БЛОК 1: Номер счётчика — сканирование QR/штрихкода
-             ═══════════════════════════════════════════════════════════ -->
-
+        <!-- ШАГ 1: Номер счётчика -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:layout_marginBottom="4dp"
-            android:text="Шаг 1 — Номер счётчика"
-            android:textSize="13sp"
+            android:layout_marginBottom="6dp"
+            android:text="ШАГ 1 — НОМЕР СЧЁТЧИКА"
+            android:textSize="12sp"
             android:textColor="@color/colorTextSecondary"
-            android:textAllCaps="true"
             android:letterSpacing="0.06" />
 
-        <!-- Поле номера счётчика с иконкой-кнопкой QR слева -->
+        <!-- Поле без android:hint внутри EditText — только через TextInputLayout -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/tilSerialNumber"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Нажмите значок для сканирования"
             app:startIconDrawable="@drawable/ic_qr_scan"
             app:startIconTint="@color/colorPrimary"
             app:endIconMode="clear_text"
+            app:hintEnabled="false"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etSerialNumber"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:hint="Нажмите для сканирования QR / штрихкода"
                 android:inputType="text"
                 android:imeOptions="actionNext"
-                android:hint="Номер счётчика (QR / штрихкод)" />
+                android:textSize="14sp" />
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Статус сканирования QR -->
         <TextView
             android:id="@+id/tvScanStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
             android:textSize="12sp"
-            android:textColor="@color/colorTextSecondary"
+            android:textColor="@color/colorSuccess"
             android:visibility="gone" />
 
-        <!-- ═══════════════════════════════════════════════════════════
-             БЛОК 2: Показания — фото + OCR
-             ═══════════════════════════════════════════════════════════ -->
-
+        <!-- ШАГ 2: Показания счётчика -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
-            android:layout_marginBottom="4dp"
-            android:text="Шаг 2 — Показания счётчика"
-            android:textSize="13sp"
+            android:layout_marginBottom="6dp"
+            android:text="ШАГ 2 — ПОКАЗАНИЯ СЧЁТЧИКА"
+            android:textSize="12sp"
             android:textColor="@color/colorTextSecondary"
-            android:textAllCaps="true"
             android:letterSpacing="0.06" />
 
-        <!-- Поле показаний с иконкой-кнопкой камеры слева -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/tilReading"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Нажмите значок для съёмки"
             app:startIconDrawable="@drawable/ic_camera"
             app:startIconTint="@color/colorPrimary"
             app:suffixText="м³"
             app:endIconMode="clear_text"
+            app:hintEnabled="false"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etReading"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:hint="Нажмите для съёмки"
                 android:inputType="number"
                 android:imeOptions="actionDone"
-                android:hint="Показания (целые м³)" />
+                android:textSize="14sp" />
 
         </com.google.android.material.textfield.TextInputLayout>
 
@@ -121,17 +112,18 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
+                android:text="Распознавание..."
                 android:textSize="12sp"
                 android:textColor="@color/colorTextSecondary"
                 android:visibility="gone" />
 
         </LinearLayout>
 
-        <!-- Превью фото со счётчиком + круглая рамка -->
+        <!-- Превью фото (БЕЗ рамки-оверлея — рамка только в сканере) -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardPreview"
             android:layout_width="match_parent"
-            android:layout_height="260dp"
+            android:layout_height="240dp"
             android:layout_marginTop="12dp"
             android:visibility="gone"
             app:cardCornerRadius="12dp">
@@ -143,55 +135,39 @@
                 android:scaleType="centerCrop"
                 android:contentDescription="Превью счётчика" />
 
-            <com.watermeter.ui.add.MeterFrameOverlay
-                android:id="@+id/meterFrameOverlay"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent" />
-
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Подсказка под превью -->
-        <TextView
-            android:id="@+id/tvHint"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="Циферблат в круге — для лучшего распознавания"
-            android:textAlignment="center"
-            android:textSize="12sp"
-            android:textColor="@color/colorTextSecondary"
-            android:visibility="gone" />
-
-        <!-- Необязательное название счётчика -->
+        <!-- Дополнительно: название -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
-            android:layout_marginBottom="4dp"
-            android:text="Дополнительно"
-            android:textSize="13sp"
+            android:layout_marginBottom="6dp"
+            android:text="ДОПОЛНИТЕЛЬНО"
+            android:textSize="12sp"
             android:textColor="@color/colorTextSecondary"
-            android:textAllCaps="true"
             android:letterSpacing="0.06" />
 
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Название счётчика (необязательно)"
             app:startIconDrawable="@drawable/ic_label"
             app:endIconMode="clear_text"
+            app:hintEnabled="false"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etMeterName"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:hint="Название счётчика (необязательно)"
                 android:inputType="text"
-                android:imeOptions="actionDone" />
+                android:imeOptions="actionDone"
+                android:textSize="14sp" />
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Кнопки одинакового размера -->
+        <!-- Кнопки одного размера -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
