@@ -9,7 +9,6 @@ import com.watermeter.data.model.Reading
 import com.watermeter.data.repository.MeterRepository
 import com.watermeter.ml.MeterOcrHelper
 import com.watermeter.ml.OcrResult
-import com.watermeter.util.ImageUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -55,9 +54,9 @@ class AddReadingViewModel @Inject constructor(
     private fun runOcr(uri: Uri, context: Context) = viewModelScope.launch {
         _uiState.value = AddUiState.Processing
         try {
+            // Фото уже обрезано по зоне прицела в MeterCameraActivity.
+            // Запускаем только OCR — никакого дополнительного кропа.
             val ocrResult = ocrHelper.recognize(context, uri)
-            // Сохраняем обрезанную копию в публичную галерею
-            ImageUtils.cropAndSaveToGallery(context, uri)
             _uiState.value = AddUiState.OcrDone(ocrResult)
         } catch (e: Exception) {
             _uiState.value = AddUiState.OcrError("Распознавание не удалось — введите вручную.")
