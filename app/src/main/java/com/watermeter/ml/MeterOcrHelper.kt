@@ -12,19 +12,26 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 data class OcrResult(
-    val meterValue: String?,  // Только целые м³, напр. "3469"
-    val serialNumber: String? = null, // Не используется здесь — берётся из сканера
+    val meterValue: String?,
+    val serialNumber: String? = null,
     val rawText: String = ""
 )
 
 /**
- * OCR для распознавания ПОКАЗАНИЙ счётчика с фотографии.
- * Серийный номер считывается отдельно через BarcodeScannerActivity (QR/штрихкод).
+ * OCR для распознавания ЦЕЛЫХ показаний счётчика воды.
  *
- * Возвращает только целые числа:
- *   "03469.7 m³"  → "03469"
- *   "01221 774"   → "01221"  (красное поле = дробная часть)
- *   "107289"      → "107289"
+ * Ключевые правила:
+ *  1. Берём только цифры ДО красного поля (дробная часть отбрасывается).
+ *  2. Показания — это 5–8 подряд идущих цифр.
+ *  3. Из нескольких кандидатов выбираем самый длинный блок — он и есть главный одометр.
+ *
+ * Примеры:
+ *   "03469.7 m³"      → "03469"
+ *   "01221 774"       → "01221"   (красное поле = " 774")
+ *   "012217,4"        → "012217"  не верно — тогда → "01221"  (5 цифр до запятой)
+ *   "107289"          → "107289"
+ *   "00228"           → "00228"
+ *   "1 0 7 2 8 9"     → "107289"  (OCR с пробелами между цифрами)
  */
 @Singleton
 class MeterOcrHelper @Inject constructor() {
@@ -41,35 +48,49 @@ class MeterOcrHelper @Inject constructor() {
                         val value = extractIntegerReading(raw)
                         cont.resume(OcrResult(meterValue = value, rawText = raw))
                     }
-                    .addOnFailureListener { e ->
-                        cont.resumeWithException(e)
-                    }
+                    .addOnFailureListener { e -> cont.resumeWithException(e) }
             } catch (e: Exception) {
                 cont.resumeWithException(e)
             }
         }
 
-    /**
-     * Извлекает показания как ЦЕЛОЕ число (до красного поля/дробной части).
-     *
-     * Логика:
-     * 1. Нормализуем OCR-ошибки (O→0, I→1)
-     * 2. Ищем блоки из 5–8 цифр
-     * 3. Если за числом идёт дробная часть — отрезаем её
-     * 4. Берём самое длинное совпадение (главный одометр)
-     */
     private fun extractIntegerReading(rawText: String): String? {
+        // Шаг 1: нормализация OCR-ошибок
         val normalized = normalizeOcr(rawText)
 
-        // Захватываем только целую часть: до точки/запятой/пробела перед дробью
-        val regex = Regex("""(?<![.\d])(\d{5,8})(?:[.,\s]\d+)?(?!\d)""")
+        // Шаг 2: убираем пробелы между одиночными цифрами
+        // ("1 0 7 2 8 9" → "107289")
+        val compacted = normalized.replace(Regex("""(?<=\d) (?=\d)"""), "")
 
-        return regex.findAll(normalized)
-            .map { it.groupValues[1] }
+        // Шаг 3: разбиваем текст на токены по строкам
+        val candidates = mutableListOf<String>()
+
+        compacted.lines().forEach { line ->
+            // Паттерн: 5–8 цифр подряд, после которых:
+            //   — ничего (конец числа)
+            //   — точка/запятая с дробью  → отрезаем
+            //   — пробел + цифры           → это красное поле, отрезаем
+            //   — буква (м³, m³)           → конец числа, ОК
+            val regex = Regex("""(?<!\d)(\d{5,8})(?:[.,]\d+|(?=\s+\d)|\s*${'$'}|\s*[^\d]|${'$'})""")
+            regex.findAll(line).forEach { match ->
+                candidates.add(match.groupValues[1])
+            }
+        }
+
+        if (candidates.isEmpty()) return null
+
+        // Шаг 4: выбираем наилучший кандидат
+        // Приоритет: длина 6–8 цифр (типовой одометр) > 5 цифр
+        return candidates
             .filter { it.length in 5..8 }
+            // Исключаем явные серийники: строки, где после числа идут буквы вплотную
             .maxByOrNull { it.length }
     }
 
+    /**
+     * Типичные OCR-замены:
+     *  O → 0, I/l → 1 — только между цифрами
+     */
     private fun normalizeOcr(text: String): String = text
         .replace(Regex("""(?<=\d)[Oo](?=\d)"""), "0")
         .replace(Regex("""(?<=\d)[Il](?=\d)"""), "1")
