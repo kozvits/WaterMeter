@@ -1,25 +1,22 @@
 package com.watermeter.ui.add
 
 import android.content.Context
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.DashPathEffect
-import android.graphics.Paint
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffXfermode
-import android.graphics.RectF
+import android.graphics.*
 import android.util.AttributeSet
 import android.view.View
+import android.animation.ValueAnimator
+import android.view.animation.LinearInterpolator
 
 /**
- * Накладывается поверх превью фото.
- * Рисует:
- *  - полупрозрачное затемнение вне круга
- *  - чёткую круглую рамку с угловыми маркерами
- *  - подсказку "Циферблат в круг"
+ * Прямоугольный прицел для наведения на циферблат счётчика.
  *
- * Используется как визуальный ориентир при съёмке.
- * Не влияет на обрезку/OCR — это только UI-подсказка.
+ * Геометрия зоны сканирования:
+ *   — ширина  = 88% экрана
+ *   — высота  = 22% экрана  (узкая полоса — только одометр, без лишнего)
+ *   — позиция = 38% от верха (чуть выше центра — удобно держать телефон)
+ *
+ * Эта же зона используется в MeterCameraActivity для кропа фото перед OCR.
+ * Статический метод getScanRect() возвращает координаты зоны в px.
  */
 class MeterFrameOverlay @JvmOverloads constructor(
     context: Context,
@@ -27,99 +24,132 @@ class MeterFrameOverlay @JvmOverloads constructor(
     defStyle: Int = 0
 ) : View(context, attrs, defStyle) {
 
-    // Основной круг: занимает 82% короткой стороны, центрирован
-    private val circlePadding = 0.09f   // 9% отступ с каждой стороны
+    companion object {
+        const val RECT_WIDTH_RATIO  = 0.88f   // 88% ширины
+        const val RECT_HEIGHT_RATIO = 0.22f   // 22% высоты
+        const val RECT_TOP_RATIO    = 0.36f   // отступ сверху 36%
 
-    // Краска для затемнения за пределами круга
-    private val dimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#99000000")  // 60% прозрачности
+        /** Возвращает прямоугольник зоны OCR в координатах View */
+        fun getScanRect(viewWidth: Int, viewHeight: Int): RectF {
+            val w = viewWidth * RECT_WIDTH_RATIO
+            val h = viewHeight * RECT_HEIGHT_RATIO
+            val left = (viewWidth - w) / 2f
+            val top  = viewHeight * RECT_TOP_RATIO
+            return RectF(left, top, left + w, top + h)
+        }
     }
 
-    // Краска для "вырезания" круга из затемнения (Porter-Duff CLEAR)
-    private val clearPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    // ── Краски ────────────────────────────────────────────────────────────────
+
+    private val dimPaint = Paint().apply {
+        color = Color.parseColor("#B3000000")   // 70% затемнение
+    }
+
+    private val clearPaint = Paint().apply {
         xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
     }
 
-    // Внешняя рамка круга
-    private val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         color = Color.WHITE
-        strokeWidth = 3f
-        alpha = 230
+        strokeWidth = 2.5f
+        alpha = 220
     }
 
-    // Пунктирная внутренняя рамка
-    private val dashedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        color = Color.WHITE
-        strokeWidth = 1.5f
-        alpha = 140
-        pathEffect = DashPathEffect(floatArrayOf(12f, 8f), 0f)
-    }
-
-    // Угловые маркеры (4 дуги по 30° на каждом квадранте)
     private val cornerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        color = Color.parseColor("#29B6F6")   // акцентный голубой
-        strokeWidth = 5f
+        color = Color.parseColor("#29B6F6")
+        strokeWidth = 6f
         strokeCap = Paint.Cap.ROUND
     }
 
-    // Крестик в центре
-    private val crossPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    // Горизонтальные направляющие внутри зоны
+    private val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         color = Color.WHITE
-        strokeWidth = 1.5f
-        alpha = 100
+        strokeWidth = 0.8f
+        alpha = 60
+        pathEffect = DashPathEffect(floatArrayOf(8f, 6f), 0f)
     }
 
-    private val circleRect = RectF()
-    private val innerRect = RectF()
+    // Анимированная вертикальная линия сканирования
+    private val scanLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 2f
+        alpha = 190
+    }
+
+    private val scanRect = RectF()
+    private var scanLineX = 0f
+
+    private val animator = ValueAnimator.ofFloat(0f, 1f).apply {
+        duration = 2000
+        repeatCount = ValueAnimator.INFINITE
+        repeatMode = ValueAnimator.RESTART
+        interpolator = LinearInterpolator()
+        addUpdateListener { anim ->
+            scanLineX = anim.animatedValue as Float
+            invalidate()
+        }
+    }
+
+    override fun onAttachedToWindow() { super.onAttachedToWindow(); animator.start() }
+    override fun onDetachedFromWindow() { super.onDetachedFromWindow(); animator.cancel() }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        scanRect.set(getScanRect(w, h))
+
+        // Горизонтальный градиент для линии сканирования
+        scanLinePaint.shader = LinearGradient(
+            0f, 0f, 0f, scanRect.height(),
+            intArrayOf(
+                Color.TRANSPARENT,
+                Color.parseColor("#8829B6F6"),
+                Color.parseColor("#CC29B6F6"),
+                Color.parseColor("#8829B6F6"),
+                Color.TRANSPARENT
+            ),
+            null,
+            Shader.TileMode.CLAMP
+        )
+    }
 
     override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
-
         val w = width.toFloat()
         val h = height.toFloat()
-        val shortSide = minOf(w, h)
-        val radius = shortSide * (1f - circlePadding * 2) / 2f
-        val cx = w / 2f
-        val cy = h / 2f
 
-        circleRect.set(cx - radius, cy - radius, cx + radius, cy + radius)
-
-        // ── Слой затемнения ────────────────────────────────────────────────
-        // Используем saveLayer чтобы CLEAR работал корректно
-        val layerSave = canvas.saveLayer(0f, 0f, w, h, null)
-
-        // Заливаем весь экран затемнением
+        // ── Затемнение вне прямоугольника ────────────────────────────────
+        val layer = canvas.saveLayer(0f, 0f, w, h, null)
         canvas.drawRect(0f, 0f, w, h, dimPaint)
+        canvas.drawRoundRect(scanRect, 4f, 4f, clearPaint)
+        canvas.restoreToCount(layer)
 
-        // Вырезаем круг (прозрачная область = циферблат виден чётко)
-        canvas.drawCircle(cx, cy, radius, clearPaint)
+        // ── Рамка прямоугольника ──────────────────────────────────────────
+        canvas.drawRoundRect(scanRect, 4f, 4f, borderPaint)
 
-        canvas.restoreToCount(layerSave)
+        // ── Угловые маркеры (L-образные) ─────────────────────────────────
+        val c = 24f
+        val r = scanRect
+        drawCorner(canvas, r.left,  r.top,    +c, +c)
+        drawCorner(canvas, r.right, r.top,    -c, +c)
+        drawCorner(canvas, r.left,  r.bottom, +c, -c)
+        drawCorner(canvas, r.right, r.bottom, -c, -c)
 
-        // ── Внешняя рамка ──────────────────────────────────────────────────
-        canvas.drawCircle(cx, cy, radius, rimPaint)
+        // ── Горизонтальные направляющие (деление зоны на трети) ──────────
+        val third = scanRect.height() / 3f
+        canvas.drawLine(r.left + 8f,  r.top + third,     r.right - 8f, r.top + third,     guidePaint)
+        canvas.drawLine(r.left + 8f,  r.top + third * 2, r.right - 8f, r.top + third * 2, guidePaint)
 
-        // ── Пунктирная внутренняя рамка (чуть меньше) ─────────────────────
-        val innerRadius = radius - 10f
-        innerRect.set(cx - innerRadius, cy - innerRadius, cx + innerRadius, cy + innerRadius)
-        canvas.drawOval(innerRect, dashedPaint)
-
-        // ── Угловые маркеры — 4 дуги по 28° ───────────────────────────────
-        val cornerRect = RectF(cx - radius - 2f, cy - radius - 2f,
-                               cx + radius + 2f, cy + radius + 2f)
-        val sweepAngle = 28f
-        val startAngles = floatArrayOf(-104f, -14f, 76f, 166f)   // СЗ, СВ, ЮВ, ЮЗ
-        for (start in startAngles) {
-            canvas.drawArc(cornerRect, start, sweepAngle, false, cornerPaint)
+        // ── Анимированная вертикальная линия ─────────────────────────────
+        val lineX = scanRect.left + scanRect.width() * scanLineX
+        if (lineX in scanRect.left..scanRect.right) {
+            canvas.drawLine(lineX, scanRect.top, lineX, scanRect.bottom, scanLinePaint)
         }
+    }
 
-        // ── Центральный крестик ────────────────────────────────────────────
-        val crossLen = 14f
-        canvas.drawLine(cx - crossLen, cy, cx + crossLen, cy, crossPaint)
-        canvas.drawLine(cx, cy - crossLen, cx, cy + crossLen, crossPaint)
+    private fun drawCorner(canvas: Canvas, x: Float, y: Float, dx: Float, dy: Float) {
+        canvas.drawLine(x, y, x + dx, y, cornerPaint)
+        canvas.drawLine(x, y, x, y + dy, cornerPaint)
     }
 }
