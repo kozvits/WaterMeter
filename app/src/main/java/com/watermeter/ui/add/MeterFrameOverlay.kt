@@ -26,8 +26,8 @@ class MeterFrameOverlay @JvmOverloads constructor(
 
     companion object {
         const val RECT_WIDTH_RATIO  = 0.88f   // 88% ширины
-        const val RECT_HEIGHT_RATIO = 0.22f   // 22% высоты
-        const val RECT_TOP_RATIO    = 0.36f   // отступ сверху 36%
+        const val RECT_HEIGHT_RATIO = 0.11f   // 11% высоты (уменьшено вдвое)
+        const val RECT_TOP_RATIO    = 0.38f   // отступ сверху 38%
 
         /** Возвращает прямоугольник зоны OCR в координатах View */
         fun getScanRect(viewWidth: Int, viewHeight: Int): RectF {
@@ -135,11 +135,6 @@ class MeterFrameOverlay @JvmOverloads constructor(
         drawCorner(canvas, r.right, r.top,    -c, +c)
         drawCorner(canvas, r.left,  r.bottom, +c, -c)
         drawCorner(canvas, r.right, r.bottom, -c, -c)
-
-        // ── Горизонтальные направляющие (деление зоны на трети) ──────────
-        val third = scanRect.height() / 3f
-        canvas.drawLine(r.left + 8f,  r.top + third,     r.right - 8f, r.top + third,     guidePaint)
-        canvas.drawLine(r.left + 8f,  r.top + third * 2, r.right - 8f, r.top + third * 2, guidePaint)
 
         // ── Анимированная вертикальная линия ─────────────────────────────
         val lineX = scanRect.left + scanRect.width() * scanLineX
