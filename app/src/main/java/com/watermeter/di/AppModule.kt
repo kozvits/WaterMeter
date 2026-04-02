@@ -4,6 +4,9 @@ import android.content.Context
 import androidx.room.Room
 import com.watermeter.data.db.AppDatabase
 import com.watermeter.data.db.MeterDao
+import com.watermeter.data.repository.MeterRepository
+import com.watermeter.util.ExportImportManager
+import com.watermeter.util.SettingsManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -34,4 +37,11 @@ object AppModule {
         .readTimeout(15, TimeUnit.SECONDS)
         .writeTimeout(15, TimeUnit.SECONDS)
         .build()
+
+    @Provides
+    @Singleton
+    fun provideExportImportManager(
+        repository: MeterRepository,
+        settingsManager: SettingsManager
+    ): ExportImportManager = ExportImportManager(repository, settingsManager)
 }

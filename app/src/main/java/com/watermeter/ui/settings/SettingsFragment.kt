@@ -1,9 +1,14 @@
 package com.watermeter.ui.settings
 
+import android.app.Activity
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -13,6 +18,8 @@ import com.watermeter.databinding.FragmentSettingsBinding
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 
 @AndroidEntryPoint
 class SettingsFragment : Fragment() {
@@ -21,6 +28,24 @@ class SettingsFragment : Fragment() {
     private val binding get() = _binding!!
 
     private val viewModel: SettingsViewModel by viewModels()
+
+    // ── SAF launchers ─────────────────────────────────────────────────────────
+
+    /** Создать файл для экспорта */
+    private val createFileLauncher = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: Uri? ->
+        uri?.let { viewModel.exportData(requireContext(), it) }
+    }
+
+    /** Выбрать файл для импорта */
+    private val openFileLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let { viewModel.importData(requireContext(), it) }
+    }
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -32,16 +57,25 @@ class SettingsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Версия приложения
         binding.tvAppVersion.text = "Версия ${BuildConfig.VERSION_NAME}"
 
-        // Кнопка сохранения
         binding.btnSaveSettings.setOnClickListener {
-            val token = binding.etBotToken.text?.toString() ?: ""
+            val token  = binding.etBotToken.text?.toString() ?: ""
             val chatId = binding.etChatId.text?.toString() ?: ""
             viewModel.saveBotToken(token)
             viewModel.saveChatId(chatId)
-            Snackbar.make(binding.root, "✅ Настройки сохранены", Snackbar.LENGTH_SHORT).show()
+            showSnackbar("✅ Настройки сохранены")
+        }
+
+        // Экспорт — открываем диалог создания файла
+        binding.btnExport.setOnClickListener {
+            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            createFileLauncher.launch("WaterMeter_backup_${timestamp}.json")
+        }
+
+        // Импорт — открываем диалог выбора файла
+        binding.btnImport.setOnClickListener {
+            openFileLauncher.launch(arrayOf("application/json", "*/*"))
         }
 
         // Загружаем сохранённые значения
@@ -59,7 +93,28 @@ class SettingsFragment : Fragment() {
                 }
             }
         }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.isLoading.collectLatest { loading ->
+                binding.progressSettings.isVisible = loading
+                binding.btnExport.isEnabled = !loading
+                binding.btnImport.isEnabled = !loading
+                binding.btnSaveSettings.isEnabled = !loading
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.event.collectLatest { event ->
+                if (event is SettingsEvent.ShowMessage) {
+                    showSnackbar(event.message)
+                    viewModel.clearEvent()
+                }
+            }
+        }
     }
+
+    private fun showSnackbar(msg: String) =
+        Snackbar.make(binding.root, msg, Snackbar.LENGTH_LONG).show()
 
     override fun onDestroyView() {
         super.onDestroyView()

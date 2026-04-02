@@ -1,11 +1,11 @@
 package com.watermeter.ui.history
 
-import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -15,6 +15,7 @@ import com.github.mikephil.charting.data.BarData
 import com.github.mikephil.charting.data.BarDataSet
 import com.github.mikephil.charting.data.BarEntry
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter
+import com.google.android.material.snackbar.Snackbar
 import com.watermeter.R
 import com.watermeter.data.model.Reading
 import com.watermeter.databinding.FragmentHistoryBinding
@@ -44,6 +45,7 @@ class HistoryFragment : Fragment() {
         setupToolbar()
         setupRecyclerView()
         setupChart()
+        setupAddButton()
         observeState()
     }
 
@@ -68,8 +70,7 @@ class HistoryFragment : Fragment() {
             legend.isEnabled = false
             setDrawGridBackground(false)
             setDrawBorders(false)
-            animateY(600)
-
+            animateY(500)
             xAxis.apply {
                 position = XAxis.XAxisPosition.BOTTOM
                 setDrawGridLines(false)
@@ -78,10 +79,15 @@ class HistoryFragment : Fragment() {
             }
             axisLeft.apply {
                 setDrawGridLines(true)
-                granularity = 1f
                 textSize = 10f
             }
             axisRight.isEnabled = false
+        }
+    }
+
+    private fun setupAddButton() {
+        binding.btnAddReading.setOnClickListener {
+            showAddReadingDialog()
         }
     }
 
@@ -90,33 +96,40 @@ class HistoryFragment : Fragment() {
             viewModel.meterWithReadings.collectLatest { data ->
                 if (data == null) return@collectLatest
 
-                // Toolbar title
+                // Заголовок
                 binding.tvMeterTitle.text = data.meter.name
                 binding.tvSerialNumber.text = "№ ${data.meter.serialNumber}"
 
                 val readings = data.readings.sortedByDescending { it.date }
                 adapter.submitList(readings)
 
-                binding.tvEmpty.visibility =
-                    if (readings.isEmpty()) View.VISIBLE else View.GONE
-                binding.recyclerHistory.visibility =
-                    if (readings.isEmpty()) View.GONE else View.VISIBLE
+                binding.tvEmpty.isVisible = readings.isEmpty()
+                binding.recyclerHistory.isVisible = readings.isNotEmpty()
 
-                // Update chart with last 6 readings
+                // Обновляем график
                 updateChart(readings.takeLast(6).reversed())
 
-                // Summary: last reading + consumption
+                // Последнее показание
                 val last = data.lastReading
                 if (last != null) {
-                    binding.tvLastReading.text = "%.3f м³".format(last.value)
+                    binding.tvLastReading.text = "%.0f м³".format(last.value)
                     binding.tvLastDate.text = DateUtils.formatDate(last.date)
                 }
+
+                // Потребление
                 val consumption = data.lastConsumption
+                binding.tvConsumption.isVisible = consumption != null
                 if (consumption != null) {
-                    binding.tvConsumption.text = "+%.3f м³".format(consumption)
-                    binding.tvConsumption.visibility = View.VISIBLE
-                } else {
-                    binding.tvConsumption.visibility = View.GONE
+                    binding.tvConsumption.text = "+%.0f м³".format(consumption)
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.snackbarMessage.collectLatest { msg ->
+                if (msg != null) {
+                    Snackbar.make(binding.root, msg, Snackbar.LENGTH_SHORT).show()
+                    viewModel.clearSnackbar()
                 }
             }
         }
@@ -124,26 +137,24 @@ class HistoryFragment : Fragment() {
 
     private fun updateChart(readings: List<Reading>) {
         if (readings.size < 2) {
-            binding.barChart.visibility = View.GONE
+            binding.barChart.isVisible = false
             return
         }
-        binding.barChart.visibility = View.VISIBLE
+        binding.barChart.isVisible = true
 
         val entries = mutableListOf<BarEntry>()
-        val labels = mutableListOf<String>()
+        val labels  = mutableListOf<String>()
 
         readings.forEachIndexed { index, reading ->
-            // Показываем потребление (разница с предыдущим), а не абсолютное значение
             val prev = readings.getOrNull(index - 1)
             val consumption = if (prev != null) (reading.value - prev.value).coerceAtLeast(0.0) else 0.0
             entries.add(BarEntry(index.toFloat(), consumption.toFloat()))
             labels.add(DateUtils.formatDateShort(reading.date))
         }
 
-        val dataSet = BarDataSet(entries, "Потребление м³").apply {
+        val dataSet = BarDataSet(entries, "Потребление").apply {
             color = requireContext().getColor(R.color.colorPrimary)
             valueTextSize = 9f
-            setDrawValues(true)
         }
 
         binding.barChart.apply {
@@ -152,6 +163,30 @@ class HistoryFragment : Fragment() {
             xAxis.labelCount = labels.size
             invalidate()
         }
+    }
+
+    // ── Dialogs ───────────────────────────────────────────────────────────────
+
+    private fun showAddReadingDialog() {
+        val dialogView = LayoutInflater.from(requireContext())
+            .inflate(R.layout.dialog_edit_reading, null)
+        val etValue = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(
+            R.id.etReadingValue
+        )
+        AlertDialog.Builder(requireContext())
+            .setTitle("Добавить показание")
+            .setView(dialogView)
+            .setPositiveButton("Сохранить") { _, _ ->
+                val newValue = etValue.text?.toString()
+                    ?.replace(",", ".")?.toDoubleOrNull()
+                if (newValue != null && newValue > 0) {
+                    viewModel.addReading(newValue)
+                } else {
+                    Snackbar.make(binding.root, "Введите корректное значение", Snackbar.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Отмена", null)
+            .show()
     }
 
     private fun confirmDeleteReading(reading: Reading) {
@@ -169,16 +204,14 @@ class HistoryFragment : Fragment() {
         val etValue = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(
             R.id.etReadingValue
         )
-        etValue.setText(reading.value.toString())
+        etValue.setText(reading.value.toLong().toString())
 
         AlertDialog.Builder(requireContext())
             .setTitle("Редактировать показание")
             .setView(dialogView)
             .setPositiveButton("Сохранить") { _, _ ->
                 val newValue = etValue.text?.toString()?.replace(",", ".")?.toDoubleOrNull()
-                if (newValue != null) {
-                    viewModel.updateReading(reading.copy(value = newValue))
-                }
+                if (newValue != null) viewModel.updateReading(reading.copy(value = newValue))
             }
             .setNegativeButton("Отмена", null)
             .show()

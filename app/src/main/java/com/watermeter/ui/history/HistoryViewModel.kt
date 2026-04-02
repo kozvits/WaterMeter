@@ -21,24 +21,33 @@ class HistoryViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    // Nav graph передаёт meterId как Int (argType="integer")
-    // Конвертируем в Long для Room
-    private val meterId: Long = (savedStateHandle.get<Int>("meterId") ?: -1).toLong()
+    // meterId приходит как Int из nav_graph (argType="integer")
+    val meterId: Long = (savedStateHandle.get<Int>("meterId") ?: -1).toLong()
 
     val meterWithReadings: StateFlow<MeterWithReadings?> = repository
         .getMeterWithReadings(meterId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    private val _event = MutableStateFlow<String?>(null)
-    val event: StateFlow<String?> = _event.asStateFlow()
+    private val _snackbarMessage = MutableStateFlow<String?>(null)
+    val snackbarMessage: StateFlow<String?> = _snackbarMessage.asStateFlow()
 
     fun deleteReading(reading: Reading) = viewModelScope.launch {
         repository.deleteReading(reading)
+        _snackbarMessage.value = "Показание удалено"
     }
 
     fun updateReading(reading: Reading) = viewModelScope.launch {
         repository.updateReading(reading)
+        _snackbarMessage.value = "Показание обновлено"
     }
 
-    fun clearEvent() { _event.value = null }
+    fun addReading(value: Double) = viewModelScope.launch {
+        if (meterId < 0) return@launch
+        repository.insertReading(
+            Reading(meterId = meterId, value = value)
+        )
+        _snackbarMessage.value = "Показание добавлено"
+    }
+
+    fun clearSnackbar() { _snackbarMessage.value = null }
 }

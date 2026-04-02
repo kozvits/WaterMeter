@@ -9,7 +9,6 @@
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
-
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
@@ -17,12 +16,12 @@
             app:navigationIcon="@drawable/ic_arrow_back"
             app:titleTextColor="@color/white"
             android:background="@color/colorPrimary" />
-
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:paddingBottom="80dp"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
         <LinearLayout
@@ -31,7 +30,7 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <!-- Meter info card -->
+            <!-- Карточка счётчика -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -120,32 +119,28 @@
                                 android:visibility="gone" />
 
                         </LinearLayout>
-
                     </LinearLayout>
-
                 </LinearLayout>
-
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Chart -->
+            <!-- График -->
             <com.github.mikephil.charting.charts.BarChart
                 android:id="@+id/barChart"
                 android:layout_width="match_parent"
-                android:layout_height="180dp"
+                android:layout_height="160dp"
                 android:layout_marginTop="16dp"
                 android:visibility="gone" />
 
-            <!-- History list header -->
+            <!-- Заголовок истории -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="20dp"
                 android:layout_marginBottom="4dp"
-                android:text="История показаний"
-                android:textSize="13sp"
+                android:text="ИСТОРИЯ ПОКАЗАНИЙ"
+                android:textSize="12sp"
                 android:textColor="@color/colorTextSecondary"
-                android:textAllCaps="true"
-                android:letterSpacing="0.08" />
+                android:letterSpacing="0.06" />
 
             <TextView
                 android:id="@+id/tvEmpty"
@@ -164,7 +159,18 @@
                 android:nestedScrollingEnabled="false" />
 
         </LinearLayout>
-
     </androidx.core.widget.NestedScrollView>
+
+    <!-- FAB кнопка "Добавить показания" внизу -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnAddReading"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_gravity="bottom"
+        android:layout_margin="16dp"
+        android:text="+ Добавить показания"
+        android:backgroundTint="@color/colorPrimary"
+        app:cornerRadius="12dp"
+        app:layout_anchorGravity="bottom|center" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

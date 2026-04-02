@@ -23,22 +23,14 @@ sealed class TelegramResult {
 class TelegramSender @Inject constructor(
     private val client: OkHttpClient
 ) {
-    private val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+    private val dateFormat  = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
     private val monthFormat = SimpleDateFormat("LLLL yyyy", Locale("ru"))
 
     /**
-     * Формирует Markdown-таблицу показаний и отправляет в Telegram.
+     * Отправляет ежемесячный отчёт в Telegram.
      *
-     * Формат сообщения:
-     * ```
-     * 📊 Показания счётчиков воды
-     * Период: март 2026
-     *
-     * | № | Номер счётчика | Название | Показания (м³) | Дата |
-     * |---|----------------|----------|----------------|------|
-     * | 1 | ВСХ-15-001     | Кухня    | 147.832        | 24.03.2026 |
-     * ...
-     * ```
+     * Столбцы таблицы:
+     *   № | Название | Номер счётчика | Показания (м³) | Дата
      */
     suspend fun sendMonthlyReport(
         botToken: String,
@@ -72,8 +64,7 @@ class TelegramSender @Inject constructor(
                 TelegramResult.Success
             } else {
                 val json = JSONObject(responseBody)
-                val desc = json.optString("description", "Неизвестная ошибка")
-                TelegramResult.Error("Ошибка Telegram: $desc")
+                TelegramResult.Error("Ошибка Telegram: ${json.optString("description", "Неизвестная ошибка")}")
             }
         } catch (e: Exception) {
             TelegramResult.Error("Ошибка сети: ${e.localizedMessage}")
@@ -82,12 +73,9 @@ class TelegramSender @Inject constructor(
 
     private fun buildMarkdownTable(metersWithReadings: List<Pair<Meter, Reading?>>): String {
         val now = Calendar.getInstance()
-        val monthTitle = monthFormat.format(now.time)
-            .replaceFirstChar { it.uppercaseChar() }
+        val monthTitle = monthFormat.format(now.time).replaceFirstChar { it.uppercaseChar() }
 
         val sb = StringBuilder()
-
-        // Заголовок
         sb.appendLine("📊 *Показания счётчиков воды*")
         sb.appendLine("Период: *${escapeMarkdown(monthTitle)}*")
         sb.appendLine()
@@ -97,51 +85,45 @@ class TelegramSender @Inject constructor(
             return sb.toString()
         }
 
-        // Таблица в виде кодового блока (моноширинный шрифт — лучшее отображение)
+        // Формируем таблицу в кодовом блоке (моноширинный шрифт)
         sb.appendLine("```")
-        // Шапка таблицы
-        sb.appendLine("%-4s %-18s %-12s %-12s".format(
-            "№", "Номер счётчика", "Показания", "Дата"
-        ))
-        sb.appendLine("-".repeat(50))
+
+        // Вычисляем максимальные длины столбцов для выравнивания
+        val maxName   = metersWithReadings.maxOf { it.first.name.length }.coerceIn(8, 16)
+        val maxSerial = metersWithReadings.maxOf { it.first.serialNumber.length }.coerceIn(10, 18)
+
+        // Шапка: № | Название | Номер счётчика | Показания | Дата
+        val header = "%-3s  %-${maxName}s  %-${maxSerial}s  %-10s  %-10s".format(
+            "№", "Название", "Номер счётчика", "Показания", "Дата"
+        )
+        sb.appendLine(header)
+        sb.appendLine("-".repeat(header.length))
 
         metersWithReadings.forEachIndexed { index, (meter, reading) ->
-            val valueStr = reading?.let { "%.3f м³".format(it.value) } ?: "нет данных"
-            val dateStr  = reading?.let { dateFormat.format(it.date) } ?: "—"
-            val serial   = meter.serialNumber.take(18)
+            val valueStr  = reading?.let { "%.0f м³".format(it.value) } ?: "нет данных"
+            val dateStr   = reading?.let { dateFormat.format(it.date) } ?: "—"
+            val name      = meter.name.take(maxName)
+            val serial    = meter.serialNumber.take(maxSerial)
 
-            sb.appendLine("%-4d %-18s %-12s %-12s".format(
-                index + 1, serial, valueStr, dateStr
-            ))
+            sb.appendLine(
+                "%-3d  %-${maxName}s  %-${maxSerial}s  %-10s  %-10s".format(
+                    index + 1, name, serial, valueStr, dateStr
+                )
+            )
         }
 
-        sb.appendLine("-".repeat(50))
-        sb.appendLine("Итого счётчиков: ${metersWithReadings.size}")
+        sb.appendLine("-".repeat(header.length))
+        sb.appendLine("Итого: ${metersWithReadings.size} счётчиков")
         sb.append("```")
 
         return sb.toString()
     }
 
-    /**
-     * Экранирует спецсимволы MarkdownV2 вне кодового блока.
-     */
     private fun escapeMarkdown(text: String): String =
-        text.replace("_", "\\_")
-            .replace("*", "\\*")
-            .replace("[", "\\[")
-            .replace("]", "\\]")
-            .replace("(", "\\(")
-            .replace(")", "\\)")
-            .replace("~", "\\~")
-            .replace("`", "\\`")
-            .replace(">", "\\>")
-            .replace("#", "\\#")
-            .replace("+", "\\+")
-            .replace("-", "\\-")
-            .replace("=", "\\=")
-            .replace("|", "\\|")
-            .replace("{", "\\{")
-            .replace("}", "\\}")
-            .replace(".", "\\.")
-            .replace("!", "\\!")
+        text.replace("_", "\\_").replace("*", "\\*").replace("[", "\\[")
+            .replace("]", "\\]").replace("(", "\\(").replace(")", "\\)")
+            .replace("~", "\\~").replace("`", "\\`").replace(">", "\\>")
+            .replace("#", "\\#").replace("+", "\\+").replace("-", "\\-")
+            .replace("=", "\\=").replace("|", "\\|").replace("{", "\\{")
+            .replace("}", "\\}").replace(".", "\\.").replace("!", "\\!")
 }
