@@ -7,7 +7,9 @@
     android:orientation="vertical"
     android:padding="16dp">
 
+    <!-- Поле показания -->
     <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/tilReadingValue"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:hint="Показания (м³)"
@@ -19,8 +21,49 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:inputType="numberDecimal"
-            android:imeOptions="actionDone" />
+            android:imeOptions="actionDone"
+            android:textColor="@color/colorTextPrimary" />
 
     </com.google.android.material.textfield.TextInputLayout>
+
+    <!-- Дата показания -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="4dp"
+        android:text="ДАТА ПОКАЗАНИЯ"
+        android:textSize="11sp"
+        android:textColor="@color/colorTextSecondary"
+        android:letterSpacing="0.06" />
+
+    <LinearLayout
+        android:id="@+id/layoutDatePicker"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:clickable="true"
+        android:focusable="true"
+        android:foreground="?attr/selectableItemBackground"
+        android:paddingHorizontal="12dp"
+        android:background="@drawable/border_rounded">
+
+        <TextView
+            android:id="@+id/tvDialogDate"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="15sp"
+            android:textColor="@color/colorTextPrimary" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📅"
+            android:textSize="16sp"
+            android:layout_marginStart="8dp" />
+
+    </LinearLayout>
 
 </LinearLayout>

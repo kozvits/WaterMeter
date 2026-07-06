@@ -41,10 +41,10 @@ class HistoryViewModel @Inject constructor(
         _snackbarMessage.value = "Показание обновлено"
     }
 
-    fun addReading(value: Double) = viewModelScope.launch {
+    fun addReading(value: Double, date: Long = System.currentTimeMillis()) = viewModelScope.launch {
         if (meterId < 0) return@launch
         repository.insertReading(
-            Reading(meterId = meterId, value = value)
+            Reading(meterId = meterId, value = value, date = date)
         )
         _snackbarMessage.value = "Показание добавлено"
     }

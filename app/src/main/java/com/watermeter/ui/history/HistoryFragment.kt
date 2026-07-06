@@ -1,5 +1,6 @@
 package com.watermeter.ui.history
 
+import android.app.DatePickerDialog
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -23,6 +24,7 @@ import com.watermeter.util.DateUtils
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.util.Calendar
 
 @AndroidEntryPoint
 class HistoryFragment : Fragment() {
@@ -173,6 +175,35 @@ class HistoryFragment : Fragment() {
         val etValue = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(
             R.id.etReadingValue
         )
+        val tvDate = dialogView.findViewById<android.widget.TextView>(R.id.tvDialogDate)
+        val layoutDate = dialogView.findViewById<android.view.View>(R.id.layoutDatePicker)
+
+        var selectedDate = System.currentTimeMillis()
+        tvDate.text = DateUtils.formatDate(selectedDate)
+
+        layoutDate.setOnClickListener {
+            val cal = Calendar.getInstance().apply { timeInMillis = selectedDate }
+            DatePickerDialog(
+                requireContext(),
+                { _, year, month, dayOfMonth ->
+                    val cal2 = Calendar.getInstance().apply {
+                        set(Calendar.YEAR, year)
+                        set(Calendar.MONTH, month)
+                        set(Calendar.DAY_OF_MONTH, dayOfMonth)
+                        set(Calendar.HOUR_OF_DAY, 12)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    }
+                    selectedDate = cal2.timeInMillis
+                    tvDate.text = DateUtils.formatDate(selectedDate)
+                },
+                cal.get(Calendar.YEAR),
+                cal.get(Calendar.MONTH),
+                cal.get(Calendar.DAY_OF_MONTH)
+            ).show()
+        }
+
         AlertDialog.Builder(requireContext())
             .setTitle("Добавить показание")
             .setView(dialogView)
@@ -180,7 +211,7 @@ class HistoryFragment : Fragment() {
                 val newValue = etValue.text?.toString()
                     ?.replace(",", ".")?.toDoubleOrNull()
                 if (newValue != null && newValue > 0) {
-                    viewModel.addReading(newValue)
+                    viewModel.addReading(newValue, selectedDate)
                 } else {
                     Snackbar.make(binding.root, "Введите корректное значение", Snackbar.LENGTH_SHORT).show()
                 }
@@ -204,14 +235,42 @@ class HistoryFragment : Fragment() {
         val etValue = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(
             R.id.etReadingValue
         )
+        val tvDate = dialogView.findViewById<android.widget.TextView>(R.id.tvDialogDate)
+        val layoutDate = dialogView.findViewById<android.view.View>(R.id.layoutDatePicker)
+
         etValue.setText(reading.value.toLong().toString())
+        var selectedDate = reading.date
+        tvDate.text = DateUtils.formatDate(selectedDate)
+
+        layoutDate.setOnClickListener {
+            val cal = Calendar.getInstance().apply { timeInMillis = selectedDate }
+            DatePickerDialog(
+                requireContext(),
+                { _, year, month, dayOfMonth ->
+                    val cal2 = Calendar.getInstance().apply {
+                        set(Calendar.YEAR, year)
+                        set(Calendar.MONTH, month)
+                        set(Calendar.DAY_OF_MONTH, dayOfMonth)
+                        set(Calendar.HOUR_OF_DAY, 12)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    }
+                    selectedDate = cal2.timeInMillis
+                    tvDate.text = DateUtils.formatDate(selectedDate)
+                },
+                cal.get(Calendar.YEAR),
+                cal.get(Calendar.MONTH),
+                cal.get(Calendar.DAY_OF_MONTH)
+            ).show()
+        }
 
         AlertDialog.Builder(requireContext())
             .setTitle("Редактировать показание")
             .setView(dialogView)
             .setPositiveButton("Сохранить") { _, _ ->
                 val newValue = etValue.text?.toString()?.replace(",", ".")?.toDoubleOrNull()
-                if (newValue != null) viewModel.updateReading(reading.copy(value = newValue))
+                if (newValue != null) viewModel.updateReading(reading.copy(value = newValue, date = selectedDate))
             }
             .setNegativeButton("Отмена", null)
             .show()

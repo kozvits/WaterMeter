@@ -1,22 +1,28 @@
 package com.watermeter.ui.add
 
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.common.InputImage
 import com.watermeter.data.model.Meter
 import com.watermeter.data.model.Reading
 import com.watermeter.data.repository.MeterRepository
 import com.watermeter.ml.MeterOcrHelper
 import com.watermeter.ml.OcrResult
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.Calendar
 import javax.inject.Inject
+import kotlin.coroutines.resume
 
 sealed class AddUiState {
     object Idle : AddUiState()
@@ -41,6 +47,9 @@ class AddReadingViewModel @Inject constructor(
 
     private val _selectedDate = MutableStateFlow(System.currentTimeMillis())
     val selectedDate: StateFlow<Long> = _selectedDate.asStateFlow()
+
+    private val _scannedBarcode = MutableStateFlow<String?>(null)
+    val scannedBarcode: StateFlow<String?> = _scannedBarcode.asStateFlow()
 
     // URI файла, сохранённого MeterCameraActivity
     private var photoFileUri: Uri? = null
@@ -73,6 +82,48 @@ class AddReadingViewModel @Inject constructor(
         _imageUri.value = uri
         photoFileUri = uri
         runOcr(uri, context)
+    }
+
+    /**
+     * Обработка изображения из галереи: параллельно запускает OCR (показания)
+     * и сканирование штрихкода (серийный номер).
+     */
+    fun processGalleryImage(uri: Uri, context: Context) {
+        _imageUri.value = uri
+        photoFileUri = uri
+        _scannedBarcode.value = null
+
+        launch {
+            val barcodeText = scanBarcode(uri, context)
+            if (!barcodeText.isNullOrBlank()) {
+                _scannedBarcode.value = barcodeText
+            }
+        }
+
+        runOcr(uri, context)
+    }
+
+    private suspend fun scanBarcode(uri: Uri, context: Context): String? {
+        return try {
+            val inputStream = context.contentResolver.openInputStream(uri) ?: return null
+            val bmp = BitmapFactory.decodeStream(inputStream)
+            inputStream.close()
+            if (bmp == null) return null
+
+            val image = InputImage.fromBitmap(bmp, 0)
+            val scanner = BarcodeScanning.getClient()
+            suspendCancellableCoroutine { cont ->
+                scanner.process(image)
+                    .addOnSuccessListener { barcodes ->
+                        cont.resume(barcodes.firstOrNull { !it.rawValue.isNullOrBlank() }?.rawValue)
+                    }
+                    .addOnFailureListener { cont.resume(null) }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
     }
 
     private fun runOcr(uri: Uri, context: Context) = viewModelScope.launch {
@@ -161,6 +212,7 @@ class AddReadingViewModel @Inject constructor(
         _uiState.value = AddUiState.Idle
         _imageUri.value = null
         _selectedDate.value = System.currentTimeMillis()
+        _scannedBarcode.value = null
         photoFileUri = null
         _currentSerialNumber = ""
     }

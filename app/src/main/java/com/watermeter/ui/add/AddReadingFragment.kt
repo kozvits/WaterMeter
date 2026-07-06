@@ -78,12 +78,12 @@ class AddReadingFragment : Fragment() {
         }
     }
 
-    /** Выбор фото из галереи → URI → OCR */
+    /** Выбор фото из галереи → URI → OCR + штрихкод */
     private val galleryLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let {
-            viewModel.setImageUri(it, requireContext())
+            viewModel.processGalleryImage(it, requireContext())
         }
     }
 
@@ -142,6 +142,17 @@ class AddReadingFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.selectedDate.collectLatest { timestamp ->
                 binding.tvDateLabel.text = DateUtils.formatDate(timestamp)
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.scannedBarcode.collectLatest { barcode ->
+                if (!barcode.isNullOrBlank()) {
+                    binding.etSerialNumber.setText(barcode)
+                    binding.tvScanStatus.text = "✅ Штрихкод: $barcode"
+                    binding.tvScanStatus.isVisible = true
+                    viewModel.onSerialNumberScanned(barcode)
+                }
             }
         }
 
