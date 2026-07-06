@@ -13,7 +13,6 @@ import com.watermeter.data.repository.MeterRepository
 import com.watermeter.ml.MeterOcrHelper
 import com.watermeter.ml.OcrResult
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -93,7 +92,7 @@ class AddReadingViewModel @Inject constructor(
         photoFileUri = uri
         _scannedBarcode.value = null
 
-        launch {
+        viewModelScope.launch {
             val barcodeText = scanBarcode(uri, context)
             if (!barcodeText.isNullOrBlank()) {
                 _scannedBarcode.value = barcodeText
@@ -119,8 +118,6 @@ class AddReadingViewModel @Inject constructor(
                     }
                     .addOnFailureListener { cont.resume(null) }
             }
-        } catch (e: CancellationException) {
-            throw e
         } catch (e: Exception) {
             null
         }
