@@ -2,6 +2,7 @@ package com.watermeter.ui.add
 
 import android.Manifest
 import android.app.Activity
+import android.app.DatePickerDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -17,9 +18,11 @@ import com.bumptech.glide.Glide
 import com.google.android.material.snackbar.Snackbar
 import com.watermeter.databinding.FragmentAddReadingBinding
 import com.watermeter.ml.OcrResult
+import com.watermeter.util.DateUtils
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.util.Calendar
 
 @AndroidEntryPoint
 class AddReadingFragment : Fragment() {
@@ -68,11 +71,19 @@ class AddReadingFragment : Fragment() {
                 binding.etSerialNumber.setText(value)
                 binding.tvScanStatus.text = "✅ Код считан: $value"
                 binding.tvScanStatus.isVisible = true
-                // Передаём серийник в ViewModel для фильтрации ложных показаний
                 viewModel.onSerialNumberScanned(value)
             } else {
                 showSnackbar("Код не распознан — введите номер вручную")
             }
+        }
+    }
+
+    /** Выбор фото из галереи → URI → OCR */
+    private val galleryLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            viewModel.setImageUri(it, requireContext())
         }
     }
 
@@ -93,19 +104,24 @@ class AddReadingFragment : Fragment() {
     }
 
     private fun setupIconListeners() {
-        // Иконка QR → сканер штрихкода/QR
+        // Иконка QR → сканер штрихкода/QR (остаётся на иконке поля серийного номера)
         binding.tilSerialNumber.setStartIconOnClickListener {
             barcodeCameraPermLauncher.launch(Manifest.permission.CAMERA)
         }
-        // Иконка камеры → MeterCameraActivity (с прицелом)
-        binding.tilReading.setStartIconOnClickListener {
-            cameraPermLauncher.launch(Manifest.permission.CAMERA)
-        }
+        // Иконка камеры на поле показаний — просто визуальный индикатор,
+        // активные кнопки вынесены ниже (btnTakePhoto / btnPickGallery)
     }
 
     private fun setupButtons() {
         binding.btnSave.setOnClickListener { saveReading() }
         binding.btnReset.setOnClickListener { resetForm() }
+        binding.btnTakePhoto.setOnClickListener {
+            cameraPermLauncher.launch(Manifest.permission.CAMERA)
+        }
+        binding.btnPickGallery.setOnClickListener {
+            galleryLauncher.launch("image/*")
+        }
+        binding.cardDatePicker.setOnClickListener { showDatePickerDialog() }
     }
 
     // ── State ─────────────────────────────────────────────────────────────────
@@ -120,6 +136,12 @@ class AddReadingFragment : Fragment() {
                 } else {
                     binding.cardPreview.isVisible = false
                 }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.selectedDate.collectLatest { timestamp ->
+                binding.tvDateLabel.text = DateUtils.formatDate(timestamp)
             }
         }
 
@@ -173,7 +195,8 @@ class AddReadingFragment : Fragment() {
         val serial = binding.etSerialNumber.text?.toString() ?: ""
         val name   = binding.etMeterName.text?.toString() ?: ""
         val value  = binding.etReading.text?.toString() ?: ""
-        viewModel.saveReading(serial, name, value)
+        val date   = viewModel.selectedDate.value
+        viewModel.saveReading(serial, name, value, date)
     }
 
     private fun resetForm() {
@@ -186,6 +209,20 @@ class AddReadingFragment : Fragment() {
     }
 
     // ── Launch activities ─────────────────────────────────────────────────────
+
+    private fun showDatePickerDialog() {
+        val cal = Calendar.getInstance()
+        cal.timeInMillis = viewModel.selectedDate.value
+        DatePickerDialog(
+            requireContext(),
+            { _, year, month, dayOfMonth ->
+                viewModel.onDateSelected(year, month, dayOfMonth)
+            },
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
 
     private fun launchMeterCamera() {
         val intent = Intent(requireContext(), MeterCameraActivity::class.java)

@@ -29,22 +29,21 @@
             android:textColor="@color/colorTextSecondary"
             android:letterSpacing="0.06" />
 
-        <!-- Поле без android:hint внутри EditText — только через TextInputLayout -->
+        <!-- Поле номера счётчика — можно сканировать QR или ввести вручную -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/tilSerialNumber"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:hint="Номер счётчика *"
             app:startIconDrawable="@drawable/ic_qr_scan"
             app:startIconTint="@color/colorPrimary"
             app:endIconMode="clear_text"
-            app:hintEnabled="false"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etSerialNumber"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Нажмите для сканирования QR / штрихкода"
                 android:inputType="text"
                 android:imeOptions="actionNext"
                 android:textSize="14sp" />
@@ -75,23 +74,58 @@
             android:id="@+id/tilReading"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:hint="Показания, м³ *"
             app:startIconDrawable="@drawable/ic_camera"
             app:startIconTint="@color/colorPrimary"
             app:suffixText="м³"
             app:endIconMode="clear_text"
-            app:hintEnabled="false"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etReading"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Нажмите для съёмки"
-                android:inputType="number"
+                android:inputType="numberDecimal"
                 android:imeOptions="actionDone"
                 android:textSize="14sp" />
 
         </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Кнопки: камера / галерея -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnTakePhoto"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                app:icon="@drawable/ic_camera_small"
+                app:iconGravity="textStart"
+                app:iconPadding="6dp"
+                android:text="Снять"
+                android:textSize="13sp"
+                android:gravity="center|start" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnPickGallery"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                app:icon="@drawable/ic_gallery"
+                app:iconGravity="textStart"
+                app:iconPadding="6dp"
+                android:text="Галерея"
+                android:textSize="13sp"
+                android:gravity="center|start" />
+
+        </LinearLayout>
 
         <!-- OCR progress -->
         <LinearLayout
@@ -137,6 +171,55 @@
 
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- ДАТА ПОКАЗАНИЯ -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="6dp"
+            android:text="ДАТА ПОКАЗАНИЯ"
+            android:textSize="12sp"
+            android:textColor="@color/colorTextSecondary"
+            android:letterSpacing="0.06" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardDatePicker"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground"
+            app:cardElevation="0dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/colorPrimary"
+            app:cardCornerRadius="8dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="16dp">
+
+                <TextView
+                    android:id="@+id/tvDateLabel"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="16sp"
+                    android:textColor="@color/colorTextPrimary" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="📅"
+                    android:textSize="18sp"
+                    android:layout_marginStart="8dp" />
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
         <!-- Дополнительно: название -->
         <TextView
             android:layout_width="match_parent"
@@ -151,16 +234,15 @@
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:hint="Название счётчика (необязательно)"
             app:startIconDrawable="@drawable/ic_label"
             app:endIconMode="clear_text"
-            app:hintEnabled="false"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etMeterName"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Название счётчика (необязательно)"
                 android:inputType="text"
                 android:imeOptions="actionDone"
                 android:textSize="14sp" />

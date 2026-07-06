@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.util.Calendar
 import javax.inject.Inject
 
 sealed class AddUiState {
@@ -38,6 +39,9 @@ class AddReadingViewModel @Inject constructor(
     private val _imageUri = MutableStateFlow<Uri?>(null)
     val imageUri: StateFlow<Uri?> = _imageUri.asStateFlow()
 
+    private val _selectedDate = MutableStateFlow(System.currentTimeMillis())
+    val selectedDate: StateFlow<Long> = _selectedDate.asStateFlow()
+
     // URI файла, сохранённого MeterCameraActivity
     private var photoFileUri: Uri? = null
 
@@ -46,6 +50,19 @@ class AddReadingViewModel @Inject constructor(
 
     fun onSerialNumberScanned(serial: String) {
         _currentSerialNumber = serial
+    }
+
+    fun onDateSelected(year: Int, month: Int, dayOfMonth: Int) {
+        val cal = Calendar.getInstance().apply {
+            set(Calendar.YEAR, year)
+            set(Calendar.MONTH, month)
+            set(Calendar.DAY_OF_MONTH, dayOfMonth)
+            set(Calendar.HOUR_OF_DAY, 12)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        _selectedDate.value = cal.timeInMillis
     }
 
     /**
@@ -95,14 +112,15 @@ class AddReadingViewModel @Inject constructor(
     fun saveReading(
         serialNumber: String,
         meterName: String,
-        valueStr: String
+        valueStr: String,
+        date: Long = System.currentTimeMillis()
     ) = viewModelScope.launch {
-        // Принимаем только целые числа
+        // Принимаем только положительные числа (целые или дробные)
         val valueClean = valueStr.trim().replace(",", ".").trimEnd('.')
         val value = valueClean.toDoubleOrNull()
 
         if (value == null || value <= 0) {
-            _uiState.value = AddUiState.Error("Введите показания — целое число, например: 3469")
+            _uiState.value = AddUiState.Error("Введите показания — положительное число, например: 3469 или 3469.5")
             return@launch
         }
         if (serialNumber.isBlank()) {
@@ -129,6 +147,7 @@ class AddReadingViewModel @Inject constructor(
             val reading = Reading(
                 meterId = meterId,
                 value = value,
+                date = date,
                 photoPath = photoFileUri?.toString()
             )
             repository.insertReading(reading)
@@ -141,6 +160,7 @@ class AddReadingViewModel @Inject constructor(
     fun resetState() {
         _uiState.value = AddUiState.Idle
         _imageUri.value = null
+        _selectedDate.value = System.currentTimeMillis()
         photoFileUri = null
         _currentSerialNumber = ""
     }

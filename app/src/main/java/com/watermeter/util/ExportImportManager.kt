@@ -113,6 +113,10 @@ class ExportImportManager @Inject constructor(
                 return ExportImportResult.Error("Неверный формат файла. Ожидается файл экспорта WaterMeterApp.")
             }
 
+            // Поддержка версий — при необходимости будет расширяться
+            @Suppress("UNUSED_VARIABLE")
+            val fileVersion = root.optInt("version", 1)
+
             // ── Импорт настроек ────────────────────────────────────────────
             if (root.has("settings")) {
                 val settings = root.getJSONObject("settings")
@@ -136,8 +140,9 @@ class ExportImportManager @Inject constructor(
 
             for (i in 0 until metersJson.length()) {
                 val mObj   = metersJson.getJSONObject(i)
-                val serial = mObj.getString("serialNumber")
-                val name   = mObj.optString("name",    serial)
+                val serial = mObj.optString("serialNumber", "").trim()
+                if (serial.isBlank()) continue  // пропускаем записи без номера
+                val name   = mObj.optString("name", serial)
                 val addr   = mObj.optString("address", "")
                 val createdAt = mObj.optLong("createdAt", System.currentTimeMillis())
 
@@ -156,7 +161,9 @@ class ExportImportManager @Inject constructor(
                 val readingsJson = mObj.optJSONArray("readings") ?: continue
                 for (j in 0 until readingsJson.length()) {
                     val rObj  = readingsJson.getJSONObject(j)
-                    val date  = rObj.getLong("date")
+                    val date  = rObj.optLong("date", System.currentTimeMillis())
+                    val value = rObj.optDouble("value", -1.0)
+                    if (value <= 0) continue  // пропускаем некорректные показания
                     val key   = "${meterId}_${date}"
 
                     if (existingReadingDates.contains(key)) continue  // пропуск дубликата
@@ -164,7 +171,7 @@ class ExportImportManager @Inject constructor(
                     repository.insertReading(
                         Reading(
                             meterId   = meterId,
-                            value     = rObj.getDouble("value"),
+                            value     = value,
                             date      = date,
                             photoPath = rObj.optString("photoPath").ifBlank { null },
                             note      = rObj.optString("note").ifBlank { null }
