@@ -226,6 +226,7 @@ class AddReadingFragment : Fragment() {
         cal.timeInMillis = viewModel.selectedDate.value
         DatePickerDialog(
             requireContext(),
+            android.app.AlertDialog.THEME_DEVICE_DEFAULT_LIGHT,
             { _, year, month, dayOfMonth ->
                 viewModel.onDateSelected(year, month, dayOfMonth)
             },

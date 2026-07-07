@@ -185,6 +185,7 @@ class HistoryFragment : Fragment() {
             val cal = Calendar.getInstance().apply { timeInMillis = selectedDate }
             DatePickerDialog(
                 requireContext(),
+                android.app.AlertDialog.THEME_DEVICE_DEFAULT_LIGHT,
                 { _, year, month, dayOfMonth ->
                     val cal2 = Calendar.getInstance().apply {
                         set(Calendar.YEAR, year)
@@ -246,6 +247,7 @@ class HistoryFragment : Fragment() {
             val cal = Calendar.getInstance().apply { timeInMillis = selectedDate }
             DatePickerDialog(
                 requireContext(),
+                android.app.AlertDialog.THEME_DEVICE_DEFAULT_LIGHT,
                 { _, year, month, dayOfMonth ->
                     val cal2 = Calendar.getInstance().apply {
                         set(Calendar.YEAR, year)
